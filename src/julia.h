@@ -522,9 +522,12 @@ typedef struct _jl_typemap_entry_t {
 // indexed by key if it is a sublevel in an array
 typedef struct _jl_typemap_level_t {
     JL_DATA_TYPE
-    jl_array_t *arg1;
-    jl_array_t *targ;
-    jl_typemap_entry_t *linear; // jl_typemap_t * (but no more levels)
+    jl_typemap_entry_t *bottom; // jl_typemap_t * (but no more levels) for entries which have no type at offs
+    jl_array_t *arg1; // contains LeafType
+    jl_array_t *targ; // contains Type{LeafType}
+    jl_array_t *name1; // contains non-abstract TypeName
+    jl_array_t *tname; // contains Type{TypeName}
+    jl_typemap_entry_t *linear; // jl_typemap_t * (but no more levels) - most entries usually end up here
     jl_typemap_t *any; // type at offs is Any
 } jl_typemap_level_t;
 
