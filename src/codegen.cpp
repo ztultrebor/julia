@@ -1234,7 +1234,7 @@ jl_code_instance_t *jl_compile_linfo(jl_method_instance_t *mi, jl_code_info_t *s
             // caller demanded that we make a new copy
             jl_ptls_t ptls = jl_get_ptls_states();
             jl_code_instance_t *uncached = (jl_code_instance_t*)jl_gc_alloc(ptls, sizeof(jl_code_instance_t),
-                    jl_code_instance_type);
+                    sizeof(jl_code_instance_type), jl_code_instance_type);
             *uncached = *codeinst;
             uncached->functionObjectsDecls.functionObject = NULL;
             uncached->functionObjectsDecls.specFunctionObject = NULL;
@@ -5132,7 +5132,7 @@ static jl_cgval_t emit_cfunction(jl_codectx_t &ctx, jl_value_t *output_type, con
         outboxed = (output_type != (jl_value_t*)jl_voidpointer_type);
         if (outboxed) {
             assert(jl_datatype_size(output_type) == sizeof(void*) * 4);
-            Value *strct = emit_allocobj(ctx, jl_datatype_size(output_type),
+            Value *strct = emit_allocobj(ctx, jl_datatype_size(output_type), jl_datatype_align(output_type),
                                          literal_pointer_val(ctx, (jl_value_t*)output_type));
             Value *derived_strct = emit_bitcast(ctx, decay_derived(strct), T_psize);
             MDNode *tbaa = best_tbaa(output_type);
@@ -7631,6 +7631,7 @@ static void init_julia_llvm_env(Module *m)
 
     std::vector<Type*> gc_alloc_args(0);
     gc_alloc_args.push_back(T_pint8);
+    gc_alloc_args.push_back(T_size);
     gc_alloc_args.push_back(T_size);
     gc_alloc_args.push_back(T_prjlvalue);
     jl_alloc_obj_func = Function::Create(FunctionType::get(T_prjlvalue, gc_alloc_args, false),

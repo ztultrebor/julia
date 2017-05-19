@@ -720,7 +720,7 @@ JL_CALLABLE(jl_f_tuple)
     if (tt->instance != NULL)
         return tt->instance;
     jl_ptls_t ptls = jl_get_ptls_states();
-    jl_value_t *jv = jl_gc_alloc(ptls, jl_datatype_size(tt), tt);
+    jl_value_t *jv = jl_gc_alloc(ptls, jl_datatype_size(tt), jl_datatype_align(tt), tt);
     for (i = 0; i < nargs; i++)
         set_nth_field(tt, (void*)jv, i, args[i]);
     return jv;
@@ -1064,7 +1064,7 @@ jl_expr_t *jl_exprn(jl_sym_t *head, size_t n)
     jl_ptls_t ptls = jl_get_ptls_states();
     jl_array_t *ar = jl_alloc_vec_any(n);
     JL_GC_PUSH1(&ar);
-    jl_expr_t *ex = (jl_expr_t*)jl_gc_alloc(ptls, sizeof(jl_expr_t),
+    jl_expr_t *ex = (jl_expr_t*)jl_gc_alloc(ptls, sizeof(jl_expr_t), /*align*/ 0,
                                             jl_expr_type);
     ex->head = head;
     ex->args = ar;
@@ -1081,7 +1081,7 @@ JL_CALLABLE(jl_f__expr)
     JL_GC_PUSH1(&ar);
     for(size_t i=0; i < nargs-1; i++)
         jl_array_ptr_set(ar, i, args[i+1]);
-    jl_expr_t *ex = (jl_expr_t*)jl_gc_alloc(ptls, sizeof(jl_expr_t),
+    jl_expr_t *ex = (jl_expr_t*)jl_gc_alloc(ptls, sizeof(jl_expr_t), /*align*/ 0,
                                             jl_expr_type);
     ex->head = (jl_sym_t*)args[0];
     ex->args = ar;
@@ -1097,7 +1097,7 @@ JL_DLLEXPORT jl_tvar_t *jl_new_typevar(jl_sym_t *name, jl_value_t *lb, jl_value_
     if ((ub != (jl_value_t *)jl_any_type && !jl_is_type(ub) && !jl_is_typevar(ub)) || jl_is_vararg_type(ub))
         jl_type_error_rt("TypeVar", "upper bound", (jl_value_t *)jl_type_type, ub);
     jl_ptls_t ptls = jl_get_ptls_states();
-    jl_tvar_t *tv = (jl_tvar_t *)jl_gc_alloc(ptls, sizeof(jl_tvar_t), jl_tvar_type);
+    jl_tvar_t *tv = (jl_tvar_t *)jl_gc_alloc(ptls, sizeof(jl_tvar_t), jl_datatype_align(jl_tvar_type), jl_tvar_type);
     tv->name = name;
     tv->lb = lb;
     tv->ub = ub;

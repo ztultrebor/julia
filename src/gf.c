@@ -287,7 +287,7 @@ JL_DLLEXPORT jl_code_instance_t *jl_set_method_inferred(
     jl_ptls_t ptls = jl_get_ptls_states();
     assert(min_world <= max_world && "attempting to set invalid world constraints");
     jl_code_instance_t *codeinst = (jl_code_instance_t*)jl_gc_alloc(ptls, sizeof(jl_code_instance_t),
-            jl_code_instance_type);
+            jl_datatype_align(jl_code_instance_type), jl_code_instance_type);
     JL_GC_PUSH1(&codeinst);
     codeinst->def = mi;
     codeinst->min_world = min_world;

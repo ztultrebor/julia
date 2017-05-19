@@ -1551,7 +1551,7 @@ static void jl_restore_system_image_from_stream(ios_t *f)
         jl_value_t **tag = tags[i];
         *tag = jl_read_value(&s);
     }
-    s.ptls->root_task = (jl_task_t*)jl_gc_alloc(s.ptls, sizeof(jl_task_t), jl_task_type);
+    s.ptls->root_task = (jl_task_t*)jl_gc_alloc(s.ptls, sizeof(jl_task_t), jl_datatype_align(jl_task_type), jl_task_type);
     memset(s.ptls->root_task, 0, sizeof(jl_task_t));
     s.ptls->root_task->tls = jl_read_value(&s);
     jl_init_int32_int64_cache();

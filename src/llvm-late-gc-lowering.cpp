@@ -2036,7 +2036,7 @@ bool LateLowerGCFrame::CleanupIR(Function &F, State *S) {
                 CI->replaceAllUsesWith(ASCI);
                 UpdatePtrNumbering(CI, ASCI, S);
             } else if (alloc_obj_func && callee == alloc_obj_func) {
-                assert(CI->getNumArgOperands() == 3);
+                assert(CI->getNumArgOperands() == 4);
 
                 // Initialize an IR builder.
                 IRBuilder<> builder(CI);
@@ -2052,6 +2052,10 @@ bool LateLowerGCFrame::CleanupIR(Function &F, State *S) {
                         builder.CreateIntCast(
                             CI->getArgOperand(1),
                             allocBytesIntrinsic->getFunctionType()->getParamType(1),
+                            false),
+                        builder.CreateIntCast(
+                            CI->getArgOperand(2),
+                            allocBytesIntrinsic->getFunctionType()->getParamType(2),
                             false)
                     });
                 newI->takeName(CI);
