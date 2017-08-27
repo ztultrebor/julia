@@ -10,7 +10,7 @@ using Base.GMP: Limb
 
 using Base: BitInteger, BitInteger_types, BitUnsigned, has_offset_axes
 
-import Base: copymutable, copy, copy!, ==, hash, convert
+import Base: copymutable, copy, copy!, ==, hash, convert, show
 using Serialization
 import Serialization: serialize, deserialize
 import Base: rand, randn
@@ -264,6 +264,7 @@ rand(                ::Type{X}, d::Integer, dims::Integer...) where {X} = rand(X
 function __init__()
     try
         seed!()
+        GLOBAL_RNG.adv_jump = big(0)
     catch ex
         Base.showerror_nostdio(ex,
             "WARNING: Error during initialization of module Random")
