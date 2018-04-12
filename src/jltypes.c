@@ -1081,6 +1081,28 @@ static jl_value_t *normalize_vararg(jl_value_t *va)
     return va;
 }
 
+static int guard_against_22624(jl_value_t *a, jl_value_t *b)
+{
+    if (a == b) return 0;
+    if ((jl_is_concrete_type(a) && jl_is_typevar(b)) ||
+        (jl_is_concrete_type(b) && jl_is_typevar(a)))
+        return 1;
+    if (jl_is_unionall(a)) a = jl_unwrap_unionall(a);
+    if (jl_is_unionall(b)) b = jl_unwrap_unionall(b);
+    if (jl_is_datatype(a) && jl_is_datatype(b)) {
+        jl_datatype_t *ad = (jl_datatype_t*)a, *bd = (jl_datatype_t*)b;
+        if (ad->name != bd->name)
+            return 1;
+        size_t np = jl_nparams(ad);
+        if (np != jl_nparams(bd)) return 1;
+        for (size_t i = 0; i < np; i++) {
+            if (guard_against_22624(jl_tparam(ad,i), jl_tparam(bd,i)))
+                return 1;
+        }
+    }
+    return 0;
+}
+
 static jl_value_t *inst_datatype_inner(jl_datatype_t *dt, jl_svec_t *p, jl_value_t **iparams, size_t ntp,
                                        int cacheable, jl_typestack_t *stack, jl_typeenv_t *env)
 {
@@ -1101,7 +1123,7 @@ static jl_value_t *inst_datatype_inner(jl_datatype_t *dt, jl_svec_t *p, jl_value
             // normalize types equal to wrappers (prepare for wrapper_id)
             jl_value_t *tw = extract_wrapper(pi);
             if (tw && tw != pi && (tn != jl_type_typename || jl_typeof(pi) == jl_typeof(tw)) &&
-                    jl_types_equal(pi, tw)) {
+                    (!guard_against_22624(pi, tw) && jl_types_equal(pi, tw))) {
                 iparams[i] = tw;
                 if (p) jl_gc_wb(p, tw);
             }
