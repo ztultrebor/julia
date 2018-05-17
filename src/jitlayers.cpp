@@ -136,6 +136,9 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level,
 #if defined(JL_MSAN_ENABLED)
         PM->add(llvm::createMemorySanitizerPass(true));
 #endif
+#if defined(JL_TSAN_ENABLED)
+        PM->add(llvm::createThreadSanitizerPass());
+#endif
         return;
     }
     PM->add(createPropagateJuliaAddrspaces());
@@ -259,6 +262,9 @@ void addOptimizationPasses(legacy::PassManagerBase *PM, int opt_level,
 #endif
 #if defined(JL_MSAN_ENABLED)
     PM->add(llvm::createMemorySanitizerPass(true));
+#endif
+#if defined(JL_TSAN_ENABLED)
+    PM->add(llvm::createThreadSanitizerPass());
 #endif
 }
 

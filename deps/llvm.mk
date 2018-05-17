@@ -412,7 +412,7 @@ else
 $(eval $(call LLVM_PATCH,llvm-D27629-AArch64-large_model_6.0.1))
 endif
 $(eval $(call LLVM_PATCH,llvm-D34078-vectorize-fdiv))
-$(eval $(call LLVM_PATCH,llvm-6.0-NVPTX-addrspaces)) # NVPTX
+$(eval $(call LLVM_PATCH,llvm-6.0-NVPTX-addrspaces)) # NVPTX, Julia specific
 $(eval $(call LLVM_PATCH,llvm-D42262-jumpthreading-not-i1)) # remove for 7.0
 $(eval $(call LLVM_PATCH,llvm-PPC-addrspaces)) # remove for 7.0
 ifeq ($(LLVM_VER_PATCH), 0)
@@ -445,6 +445,7 @@ $(eval $(call LLVM_PATCH,llvm-D50167-scev-umin))
 $(eval $(call LLVM_PATCH,llvm-rL326967-aligned-load)) # remove for 7.0
 ifeq ($(LLVM_VER_PATCH), 0)
 $(eval $(call LLVM_PATCH,llvm-windows-race))
+$(eval $(call LLVM_PATCH,llvm-julia-tsan-custom-as)) # Julia specific
 endif
 $(eval $(call LLVM_PATCH,llvm-D51842-win64-byval-cc))
 $(eval $(call LLVM_PATCH,llvm-D57118-powerpc))
