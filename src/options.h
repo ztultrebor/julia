@@ -177,6 +177,11 @@
 #define KEEP_BODIES
 #endif
 
+// TSAN doesn't like COPY_STACKS
+#if defined(JL_TSAN_ENABLED) && defined(COPY_STACKS)
+#undef COPY_STACKS
+#endif
+
 // Memory sanitizer needs TLS, which llvm only supports for the small memory model
 #if defined(JL_MSAN_ENABLED)
 // todo: fix the llvm MemoryManager to work with small memory model
