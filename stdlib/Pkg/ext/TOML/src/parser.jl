@@ -94,9 +94,9 @@ function nextpos(p::Parser)
 end
 
 "Peeks ahead `n` characters"
-function peek(p::Parser) #, i::Int=0
+function Base.peek(p::Parser) #, i::Int=0
     eof(p) && return nothing
-    res = Base.peek(p.input)
+    res = peek(p.input)
     res == -1 && return nothing
     return Char(res)
 end
