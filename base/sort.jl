@@ -6,7 +6,7 @@ import ..@__MODULE__, ..parentmodule
 const Base = parentmodule(@__MODULE__)
 using .Base.Order
 using .Base: copymutable, LinearIndices, length, (:),
-    eachindex, axes, first, last, similar, start, next, done, zip, OrdinalRange,
+    eachindex, axes, first, last, similar, zip, OrdinalRange,
     AbstractVector, @inbounds, AbstractRange, @eval, @inline, Vector, @noinline,
     AbstractMatrix, AbstractUnitRange, isless, identity, eltype, >, <, <=, >=, |, +, -, *, !,
     extrema, sub_with_overflow, add_with_overflow, oneunit, div, getindex, setindex!,
@@ -37,8 +37,6 @@ export # also exported by Base
     partialsort!,
     partialsortperm,
     partialsortperm!,
-    sortrows,
-    sortcols,
     # algorithms:
     InsertionSort,
     QuickSort,
@@ -372,6 +370,20 @@ struct InsertionSortAlg <: Algorithm end
 struct QuickSortAlg     <: Algorithm end
 struct MergeSortAlg     <: Algorithm end
 
+"""
+    PartialQuickSort{T <: Union{Int,OrdinalRange}}
+
+Indicate that a sorting function should use the partial quick sort
+algorithm. Partial quick sort returns the smallest `k` elements sorted from smallest
+to largest, finding them and sorting them using [`QuickSort`](@ref).
+
+Characteristics:
+  * *not stable*: does not preserve the ordering of elements which
+    compare equal (e.g. "a" and "A" in a sort of letters which
+    ignores case).
+  * *in-place* in memory.
+  * *divide-and-conquer*: sort strategy similar to [`MergeSort`](@ref).
+"""
 struct PartialQuickSort{T <: Union{Int,OrdinalRange}} <: Algorithm
     k::T
 end
@@ -381,8 +393,54 @@ Base.last(a::PartialQuickSort{Int}) = a.k
 Base.first(a::PartialQuickSort) = first(a.k)
 Base.last(a::PartialQuickSort) = last(a.k)
 
+"""
+    InsertionSort
+
+Indicate that a sorting function should use the insertion sort
+algorithm. Insertion sort traverses the collection one element
+at a time, inserting each element into its correct, sorted position in
+the output list.
+
+Characteristics:
+  * *stable*: preserves the ordering of elements which
+    compare equal (e.g. "a" and "A" in a sort of letters
+    which ignores case).
+  * *in-place* in memory.
+  * *quadratic performance* in the number of elements to be sorted:
+    it is well-suited to small collections but should not be used for large ones.
+"""
 const InsertionSort = InsertionSortAlg()
+"""
+    QuickSort
+
+Indicate that a sorting function should use the quick sort
+algorithm, which is *not* stable.
+
+Characteristics:
+  * *not stable*: does not preserve the ordering of elements which
+    compare equal (e.g. "a" and "A" in a sort of letters which
+    ignores case).
+  * *in-place* in memory.
+  * *divide-and-conquer*: sort strategy similar to [`MergeSort`](@ref).
+  * *good performance* for large collections.
+"""
 const QuickSort     = QuickSortAlg()
+"""
+    MergeSort
+
+Indicate that a sorting function should use the merge sort
+algorithm. Merge sort divides the collection into
+subcollections and repeatedly merges them, sorting each
+subcollection at each step, until the entire
+collection has been recombined in sorted form.
+
+Characteristics:
+  * *stable*: preserves the ordering of elements which compare
+    equal (e.g. "a" and "A" in a sort of letters which ignores
+    case).
+  * *not in-place* in memory.
+  * *divide-and-conquer* sort strategy.
+"""
 const MergeSort     = MergeSortAlg()
 
 const DEFAULT_UNSTABLE = QuickSort
@@ -904,12 +962,8 @@ function sort(A::AbstractArray;
               lt=isless,
               by=identity,
               rev::Union{Bool,Nothing}=nothing,
-              order::Ordering=Forward,
-              initialized::Union{Bool,Nothing}=nothing)
+              order::Ordering=Forward)
     dim = dims
-    if initialized !== nothing
-        Base.depwarn("`initialized` keyword argument is deprecated", :sort)
-    end
     order = ord(lt,by,rev,order)
     n = length(axes(A, dim))
     if dim != 1
@@ -931,75 +985,6 @@ end
         sort!(Av, s, s+n-1, alg, order)
     end
     Av
-end
-
-
-"""
-    sortrows(A; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward)
-
-Sort the rows of matrix `A` lexicographically.
-See [`sort!`](@ref) for a description of possible
-keyword arguments.
-
-# Examples
-```jldoctest
-julia> sortrows([7 3 5; -1 6 4; 9 -2 8])
-3×3 Array{Int64,2}:
- -1   6  4
-  7   3  5
-  9  -2  8
-
-julia> sortrows([7 3 5; -1 6 4; 9 -2 8], lt=(x,y)->isless(x[2],y[2]))
-3×3 Array{Int64,2}:
-  9  -2  8
-  7   3  5
- -1   6  4
-
-julia> sortrows([7 3 5; -1 6 4; 9 -2 8], rev=true)
-3×3 Array{Int64,2}:
-  9  -2  8
-  7   3  5
- -1   6  4
-```
-"""
-function sortrows(A::AbstractMatrix; kws...)
-    rows = [view(A, i, :) for i in axes(A,1)]
-    p = sortperm(rows; kws...)
-    A[p,:]
-end
-
-"""
-    sortcols(A; alg::Algorithm=DEFAULT_UNSTABLE, lt=isless, by=identity, rev::Bool=false, order::Ordering=Forward)
-
-Sort the columns of matrix `A` lexicographically.
-See [`sort!`](@ref) for a description of possible
-keyword arguments.
-
-# Examples
-```jldoctest
-julia> sortcols([7 3 5; 6 -1 -4; 9 -2 8])
-3×3 Array{Int64,2}:
-  3   5  7
- -1  -4  6
- -2   8  9
-
-julia> sortcols([7 3 5; 6 -1 -4; 9 -2 8], alg=InsertionSort, lt=(x,y)->isless(x[2],y[2]))
-3×3 Array{Int64,2}:
-  5   3  7
- -4  -1  6
-  8  -2  9
-
-julia> sortcols([7 3 5; 6 -1 -4; 9 -2 8], rev=true)
-3×3 Array{Int64,2}:
- 7   5   3
- 6  -4  -1
- 9   8  -2
-```
-"""
-function sortcols(A::AbstractMatrix; kws...)
-    cols = [view(A, :, i) for i in axes(A,2)]
-    p = sortperm(cols; kws...)
-    A[:,p]
 end
 
 ## fast clever sorting for floats ##

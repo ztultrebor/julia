@@ -419,7 +419,7 @@ function addprocs_locked(manager::ClusterManager; kwargs...)
         end
     end
 
-    Base._wait(t_launch)      # catches any thrown errors from the launch task
+    Base.wait(t_launch)      # catches any thrown errors from the launch task
 
     # Since all worker-to-worker setups may not have completed by the time this
     # function returns to the caller, send the complete list to all workers.
@@ -644,7 +644,7 @@ end
 
 Return the cluster cookie.
 """
-cluster_cookie() = LPROC.cookie
+cluster_cookie() = (init_multi(); LPROC.cookie)
 
 """
     cluster_cookie(cookie) -> cookie
@@ -652,6 +652,7 @@ cluster_cookie() = LPROC.cookie
 Set the passed cookie as the cluster cookie, then returns it.
 """
 function cluster_cookie(cookie)
+    init_multi()
     # The cookie must be an ASCII string with length <=  HDR_COOKIE_LEN
     @assert isascii(cookie)
     @assert length(cookie) <= HDR_COOKIE_LEN
@@ -684,10 +685,6 @@ end
 const PGRP = ProcessGroup([])
 
 function topology(t)
-    if t == :master_slave
-        Base.depwarn("The topology :master_slave is deprecated, use :master_worker instead.", :topology)
-        t = :master_worker
-    end
     @assert t in [:all_to_all, :master_worker, :custom]
     if (PGRP.topology==t) || ((myid()==1) && (nprocs()==1)) || (myid() > 1)
         PGRP.topology = t

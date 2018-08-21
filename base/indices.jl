@@ -13,7 +13,32 @@ Indices{N} = NTuple{N,AbstractUnitRange}
 ## Traits for array types ##
 
 abstract type IndexStyle end
+"""
+    IndexLinear()
+
+Subtype of [`IndexStyle`](@ref) used to describe arrays which
+are optimally indexed by one linear index.
+
+A linear indexing style uses one integer to describe the position in the array
+(even if it's a multidimensional array) and column-major
+ordering is used to access the elements. For example,
+if `A` were a `(2, 3)` custom matrix type with linear indexing,
+and we referenced `A[5]` (using linear style), this would
+be equivalent to referencing `A[1, 3]` (since `2*1 + 3 = 5`).
+See also [`IndexCartesian`](@ref).
+"""
 struct IndexLinear <: IndexStyle end
+"""
+    IndexCartesian()
+
+Subtype of [`IndexStyle`](@ref) used to describe arrays which
+are optimally indexed by a Cartesian index.
+
+A cartesian indexing style uses multiple integers/indices to describe the position in the array.
+For example, if `A` were a `(2, 3, 4)` custom matrix type with cartesian indexing,
+we could reference `A[2, 1, 3]` and Julia would automatically convert this into the
+correct location in the underlying memory. See also [`IndexLinear`](@ref).
+"""
 struct IndexCartesian <: IndexStyle end
 
 """
@@ -21,14 +46,14 @@ struct IndexCartesian <: IndexStyle end
     IndexStyle(typeof(A))
 
 `IndexStyle` specifies the "native indexing style" for array `A`. When
-you define a new `AbstractArray` type, you can choose to implement
-either linear indexing or cartesian indexing.  If you decide to
-implement linear indexing, then you must set this trait for your array
+you define a new [`AbstractArray`](@ref) type, you can choose to implement
+either linear indexing (with [`IndexLinear`](@ref)) or cartesian indexing.
+If you decide to implement linear indexing, then you must set this trait for your array
 type:
 
     Base.IndexStyle(::Type{<:MyArray}) = IndexLinear()
 
-The default is `IndexCartesian()`.
+The default is [`IndexCartesian()`](@ref).
 
 Julia's internal indexing machinery will automatically (and invisibly)
 convert all indexing operations into the preferred style. This allows users
@@ -231,8 +256,7 @@ indexing behaviors. This must return either an `Int` or an `AbstractArray` of
 `Int`s.
 """
 to_index(i::Integer) = convert(Int,i)::Int
-# TODO: Enable this new definition after the deprecations introduced in 0.7 are removed
-# to_index(i::Bool) = throw(ArgumentError("invalid index: $i of type $(typeof(i))"))
+to_index(i::Bool) = throw(ArgumentError("invalid index: $i of type $(typeof(i))"))
 to_index(I::AbstractArray{Bool}) = LogicalIndex(I)
 to_index(I::AbstractArray) = I
 to_index(I::AbstractArray{<:Union{AbstractArray, Colon}}) =
@@ -390,11 +414,11 @@ function getindex(iter::LinearIndices, i::AbstractRange{<:Integer})
 end
 # More efficient iteration — predominantly for non-vector LinearIndices
 # but one-dimensional LinearIndices must be special-cased to support OffsetArrays
-iterate(iter::LinearIndices{1}, s...) = iterate(iter.indices[1], s...)
+iterate(iter::LinearIndices{1}, s...) = iterate(axes1(iter.indices[1]), s...)
 iterate(iter::LinearIndices, i=1) = i > length(iter) ? nothing : (i, i+1)
 
 # Needed since firstindex and lastindex are defined in terms of LinearIndices
 first(iter::LinearIndices) = 1
-first(iter::LinearIndices{1}) = (@_inline_meta; first(iter.indices[1]))
+first(iter::LinearIndices{1}) = (@_inline_meta; first(axes1(iter.indices[1])))
 last(iter::LinearIndices) = (@_inline_meta; length(iter))
-last(iter::LinearIndices{1}) = (@_inline_meta; last(iter.indices[1]))
+last(iter::LinearIndices{1}) = (@_inline_meta; last(axes1(iter.indices[1])))

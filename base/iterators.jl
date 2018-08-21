@@ -181,9 +181,9 @@ Also similar to `enumerate(A)`, except `i` will be a valid index
 for `A`, while `enumerate` always counts from 1 regardless of the indices
 of `A`.
 
-Specifying `IndexLinear()` ensures that `i` will be an integer;
-specifying `IndexCartesian()` ensures that `i` will be a
-`CartesianIndex`; specifying `IndexStyle(A)` chooses whichever has
+Specifying [`IndexLinear()`](@ref) ensures that `i` will be an integer;
+specifying [`IndexCartesian()`](@ref) ensures that `i` will be a
+[`CartesianIndex`](@ref); specifying `IndexStyle(A)` chooses whichever has
 been defined as the native indexing style for array `A`.
 
 Mutation of the bounds of the underlying array will invalidate this iterator.
@@ -496,8 +496,6 @@ end
 
 @propagate_inbounds iterate(i::Rest, st=i.st) = iterate(i.itr, st)
 isdone(i::Rest, st...) = isdone(i.itr, st...)
-@propagate_inbounds iterate(i::Rest{I,S}, st::S=i.st) where {I,S<:Base.LegacyIterationCompat{I}} =
-    done(i.itr, st) ? nothing : next(i.itr, st)
 
 eltype(::Type{<:Rest{I}}) where {I} = eltype(I)
 IteratorEltype(::Type{<:Rest{I}}) where {I} = IteratorEltype(I)
@@ -803,7 +801,7 @@ iterate(::ProductIterator{Tuple{}}, state) = nothing
 @inline isdone(P::ProductIterator) = any(isdone, P.iterators)
 @inline function _pisdone(iters, states)
     iter1 = first(iters)
-    done1 = isdone(iter1, first(states)) # check step
+    done1 = isdone(iter1, first(states)[2]) # check step
     done1 === true || return done1 # false or missing
     done1 = isdone(iter1) # check restart
     done1 === true || return done1 # false or missing

@@ -1,7 +1,5 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
-__precompile__(true)
-
 module REPL
 
 using Base.Meta, Sockets
@@ -185,7 +183,7 @@ struct REPLBackendRef
     response_channel::Channel
 end
 
-function run_repl(repl::AbstractREPL, consumer::Function = x->nothing)
+function run_repl(repl::AbstractREPL, @nospecialize(consumer = x -> nothing))
     repl_channel = Channel(1)
     response_channel = Channel(1)
     backend = start_repl_backend(repl_channel, response_channel)
@@ -348,7 +346,7 @@ function complete_line(c::REPLCompletionProvider, s)
     partial = beforecursor(s.input_buffer)
     full = LineEdit.input_string(s)
     ret, range, should_complete = completions(full, lastindex(partial))
-    return map(completion_text, ret), partial[range], should_complete
+    return unique!(map(completion_text, ret)), partial[range], should_complete
 end
 
 function complete_line(c::ShellCompletionProvider, s)
@@ -356,14 +354,14 @@ function complete_line(c::ShellCompletionProvider, s)
     partial = beforecursor(s.input_buffer)
     full = LineEdit.input_string(s)
     ret, range, should_complete = shell_completions(full, lastindex(partial))
-    return map(completion_text, ret), partial[range], should_complete
+    return unique!(map(completion_text, ret)), partial[range], should_complete
 end
 
 function complete_line(c::LatexCompletions, s)
     partial = beforecursor(LineEdit.buffer(s))
     full = LineEdit.input_string(s)
     ret, range, should_complete = bslash_completions(full, lastindex(partial))[2]
-    return map(completion_text, ret), partial[range], should_complete
+    return unique!(map(completion_text, ret)), partial[range], should_complete
 end
 
 mutable struct REPLHistoryProvider <: HistoryProvider

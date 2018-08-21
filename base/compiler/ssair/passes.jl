@@ -51,7 +51,7 @@ function lift_defuse(cfg::CFG, ssa::SSADefUse)
     SSADefUse(bb_uses, bb_defs, Int[])
 end
 
-function find_curblock(domtree::DomTree, allblocks, curblock::Int)
+function find_curblock(domtree::DomTree, allblocks::Vector{Int}, curblock::Int)
     # TODO: This can be much faster by looking at current level and only
     # searching for those blocks in a sorted order
     while !(curblock in allblocks)
@@ -69,7 +69,7 @@ function val_for_def_expr(ir::IRCode, def::Int, fidx::Int)
     end
 end
 
-function compute_value_for_block(ir::IRCode, domtree::DomTree, allblocks, du, phinodes, fidx, curblock)
+function compute_value_for_block(ir::IRCode, domtree::DomTree, allblocks::Vector{Int}, du::SSADefUse, phinodes::IdDict{Int, SSAValue}, fidx::Int, curblock::Int)
     curblock = find_curblock(domtree, allblocks, curblock)
     def = 0
     for stmt in du.defs
@@ -80,7 +80,7 @@ function compute_value_for_block(ir::IRCode, domtree::DomTree, allblocks, du, ph
     def == 0 ? phinodes[curblock] : val_for_def_expr(ir, def, fidx)
 end
 
-function compute_value_for_use(ir::IRCode, domtree::DomTree, allblocks, du, phinodes, fidx, use_idx)
+function compute_value_for_use(ir::IRCode, domtree::DomTree, allblocks::Vector{Int}, du::SSADefUse, phinodes::IdDict{Int, SSAValue}, fidx::Int, use_idx::Int)
     # Find the first dominating def
     curblock = stmtblock = block_for_inst(ir.cfg, use_idx)
     curblock = find_curblock(domtree, allblocks, curblock)
@@ -502,7 +502,7 @@ function perform_lifting!(compact::IncrementalCompact,
 end
 
 assertion_counter = 0
-function getfield_elim_pass!(ir::IRCode, domtree)
+function getfield_elim_pass!(ir::IRCode, domtree::DomTree)
     compact = IncrementalCompact(ir)
     insertions = Vector{Any}()
     defuses = IdDict{Int, Tuple{IdSet{Int}, SSADefUse}}()
@@ -563,7 +563,7 @@ function getfield_elim_pass!(ir::IRCode, domtree)
             for (pidx, preserved_arg) in enumerate(old_preserves)
                 isa(preserved_arg, SSAValue) || continue
                 let intermediaries = IdSet()
-                    callback = function(@nospecialize(pi), @nospecialize(ssa))
+                    callback = function(@nospecialize(pi), ssa::AnySSAValue)
                         push!(intermediaries, ssa.id)
                         return false
                     end
@@ -617,7 +617,7 @@ function getfield_elim_pass!(ir::IRCode, domtree)
         if struct_typ.mutable
             isa(def, SSAValue) || continue
             let intermediaries = IdSet()
-                callback = function(@nospecialize(pi), @nospecialize(ssa))
+                callback = function(@nospecialize(pi), ssa::AnySSAValue)
                     push!(intermediaries, ssa.id)
                     return false
                 end
@@ -688,6 +688,9 @@ function getfield_elim_pass!(ir::IRCode, domtree)
         compact[idx] = val === nothing ? nothing : val.x
     end
 
+    # Copy the use count, `finish` may modify it and for our predicate
+    # below we need it consistent with the state of the IR here.
+    used_ssas = copy(compact.used_ssas)
     ir = finish(compact)
     # Now go through any mutable structs and see which ones we can eliminate
     for (idx, (intermediaries, defuse)) in defuses
@@ -699,9 +702,9 @@ function getfield_elim_pass!(ir::IRCode, domtree)
         nleaves = length(defuse.uses) + length(defuse.defs) + length(defuse.ccall_preserve_uses)
         nuses = 0
         for idx in intermediaries
-            nuses += compact.used_ssas[idx]
+            nuses += used_ssas[idx]
         end
-        nuses_total = compact.used_ssas[idx] + nuses - length(intermediaries)
+        nuses_total = used_ssas[idx] + nuses - length(intermediaries)
         nleaves == nuses_total || continue
         # Find the type for this allocation
         defexpr = ir[SSAValue(idx)]
@@ -717,7 +720,13 @@ function getfield_elim_pass!(ir::IRCode, domtree)
         fielddefuse = SSADefUse[SSADefUse() for _ = 1:fieldcount(typ)]
         ok = true
         for use in defuse.uses
-            field = try_compute_fieldidx_expr(typ, ir[SSAValue(use)])
+            stmt = ir[SSAValue(use)]
+            # We may have discovered above that this use is dead
+            # after the getfield elim of immutables. In that case,
+            # it would have been deleted. That's fine, just ignore
+            # the use in that case.
+            stmt === nothing && continue
+            field = try_compute_fieldidx_expr(typ, stmt)
             field === nothing && (ok = false; break)
             push!(fielddefuse[field].uses, use)
         end
@@ -747,7 +756,7 @@ function getfield_elim_pass!(ir::IRCode, domtree)
             if !isempty(du.uses)
                 push!(du.defs, idx)
                 ldu = compute_live_ins(ir.cfg, du)
-                phiblocks = []
+                phiblocks = Int[]
                 if !isempty(ldu.live_in_bbs)
                     phiblocks = idf(ir.cfg, ldu, domtree)
                 end
@@ -828,7 +837,7 @@ function mark_phi_cycles(compact, safe_phis, phi)
     end
 end
 
-function adce_pass!(ir)
+function adce_pass!(ir::IRCode)
     phi_uses = fill(0, length(ir.stmts) + length(ir.new_nodes))
     all_phis = Int[]
     compact = IncrementalCompact(ir)

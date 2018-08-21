@@ -10,14 +10,28 @@ using InteractiveUtils: code_llvm
 # demonstrate some of the type-size limits
 @test Core.Compiler.limit_type_size(Ref{Complex{T} where T}, Ref, Ref, 100, 0) == Ref
 @test Core.Compiler.limit_type_size(Ref{Complex{T} where T}, Ref{Complex{T} where T}, Ref, 100, 0) == Ref{Complex{T} where T}
+
 let comparison = Tuple{X, X} where X<:Tuple
     sig = Tuple{X, X} where X<:comparison
     ref = Tuple{X, X} where X
-    @test Core.Compiler.limit_type_size(sig, comparison, comparison, 100, 10) == comparison
-    @test Core.Compiler.limit_type_size(sig, ref, comparison, 100, 10) == ref
-    @test Core.Compiler.limit_type_size(Tuple{sig}, Tuple{ref}, comparison, 100, 10) == Tuple{ref}
-    @test Core.Compiler.limit_type_size(sig, ref, Tuple{comparison}, 100,  10) == sig
+    @test Core.Compiler.limit_type_size(sig, comparison, comparison, 100, 100) == Tuple{Tuple, Tuple}
+    @test Core.Compiler.limit_type_size(sig, ref, comparison, 100, 100) == Tuple{Any, Any}
+    @test Core.Compiler.limit_type_size(Tuple{sig}, Tuple{ref}, comparison, 100, 100) == Tuple{Tuple{Any, Any}}
+    @test Core.Compiler.limit_type_size(sig, ref, Tuple{comparison}, 100,  100) == Tuple{Tuple{X, X} where X<:Tuple, Tuple{X, X} where X<:Tuple}
+    @test Core.Compiler.limit_type_size(ref, sig, Union{}, 100, 100) == ref
 end
+
+let ref = Tuple{T, Val{T}} where T<:Val
+    sig = Tuple{T, Val{T}} where T<:(Val{T} where T<:Val)
+    @test Core.Compiler.limit_type_size(sig, ref, Union{}, 100, 100) == Tuple{Val, Val}
+    @test Core.Compiler.limit_type_size(ref, sig, Union{}, 100, 100) == ref
+end
+let ref = Tuple{T, Val{T}} where T<:(Val{T} where T<:(Val{T} where T<:(Val{T} where T<:Val)))
+    sig = Tuple{T, Val{T}} where T<:(Val{T} where T<:(Val{T} where T<:(Val{T} where T<:(Val{T} where T<:Val))))
+    @test Core.Compiler.limit_type_size(sig, ref, Union{}, 100, 100) == Tuple{Val, Val}
+    @test Core.Compiler.limit_type_size(ref, sig, Union{}, 100, 100) == ref
+end
+
 
 # PR 22120
 function tmerge_test(a, b, r, commutative=true)
@@ -559,7 +573,7 @@ end
 
 
 # issue #5575: inference with abstract types on a reasonably complex method tree
-zeros5575(::Type{T}, dims::Tuple{Vararg{Any,N}}) where {T,N} = Array{T,N}(dims)
+zeros5575(::Type{T}, dims::Tuple{Vararg{Any,N}}) where {T,N} = Array{T,N}(undef, dims)
 zeros5575(dims::Tuple) = zeros5575(Float64, dims)
 zeros5575(::Type{T}, dims...) where {T} = zeros5575(T, dims)
 zeros5575(a::AbstractArray) = zeros5575(a, Float64)
@@ -571,7 +585,7 @@ f5575() = zeros5575(Type[Float64][1], 1)
 @test Base.return_types(f5575, ())[1] == Vector
 
 g5575() = zeros(Type[Float64][1], 1)
-@test_broken Base.return_types(g5575, ())[1] == Vector # This should be fixed by removing deprecations
+@test Base.return_types(g5575, ())[1] == Vector
 
 
 # make sure Tuple{unknown} handles the possibility that `unknown` is a Vararg
@@ -815,7 +829,7 @@ err20033(x::Float64...) = prod(x)
 
 # nfields tfunc on `DataType`
 let f = ()->Val{nfields(DataType[Int][1])}
-    @test f() == Val{0}
+    @test f() == Val{length(DataType.types)}
 end
 
 # inference on invalid getfield call
@@ -987,8 +1001,8 @@ end
 @test isdefined_tfunc(Core.SimpleVector, Const(1)) === Const(false)
 @test Const(false) ⊑ isdefined_tfunc(Const(:x), Symbol)
 @test Const(false) ⊑ isdefined_tfunc(Const(:x), Const(:y))
-@test isdefined_tfunc(Vector{Int}, Const(1)) == Bool
-@test isdefined_tfunc(Vector{Any}, Const(1)) == Bool
+@test isdefined_tfunc(Vector{Int}, Const(1)) == Const(false)
+@test isdefined_tfunc(Vector{Any}, Const(1)) == Const(false)
 @test isdefined_tfunc(Module, Any, Any) === Union{}
 @test isdefined_tfunc(Module, Int) === Union{}
 @test isdefined_tfunc(Tuple{Any,Vararg{Any}}, Const(0)) === Const(false)
@@ -1694,6 +1708,49 @@ struct Foo19668
 end
 @test Base.return_types(Foo19668, ()) == [Foo19668]
 
+# this `if` statement is necessary; make sure front-end var promotion isn't fooled
+# by simple control flow.
+if true
+    struct Bar19668
+        x
+        Bar19668(; x=true) = new(x)
+    end
+end
+@test Base.return_types(Bar19668, ()) == [Bar19668]
+
+if false
+    struct RD19668
+        x
+        RD19668() = new(0)
+    end
+else
+    struct RD19668
+        x
+        RD19668(; x = true) = new(x)
+    end
+end
+@test Base.return_types(RD19668, ()) == [RD19668]
+
+# issue #15276
+function f15276(x)
+    if x > 1
+    else
+        y = 2
+        z->y
+    end
+end
+@test Base.return_types(f15276(1), (Int,)) == [Int]
+
+function g15276()
+    spp = Int[0]
+    sol = [spp[i] for i=1:0]
+    if false
+        spp[1]
+    end
+    sol
+end
+@test g15276() isa Vector{Int}
+
 # issue #27316 - inference shouldn't hang on these
 f27316(::Vector) = nothing
 f27316(::Any) = f27316(Any[][1]), f27316(Any[][1])
@@ -1729,7 +1786,8 @@ Base.iterate(i::Iterator27434) = i.x, Val(1)
 Base.iterate(i::Iterator27434, ::Val{1}) = i.y, Val(2)
 Base.iterate(i::Iterator27434, ::Val{2}) = i.z, Val(3)
 Base.iterate(::Iterator27434, ::Any) = nothing
-@test @inferred splat27434(Iterator27434(1, 2, 3)) == (1, 2, 3)
+@test @inferred(splat27434(Iterator27434(1, 2, 3))) == (1, 2, 3)
+@test @inferred((1, 2, 3) == (1, 2, 3))
 @test Core.Compiler.return_type(splat27434, Tuple{typeof(Iterators.repeated(1))}) == Union{}
 
 # issue #27078
@@ -1749,3 +1807,186 @@ test28079(p, n, m) = h28079(Foo28079(), Base.pointerref, p, n, m)
 cinfo_unoptimized = code_typed(test28079, (Ptr{Float32}, Int, Int); optimize=false)[].first
 cinfo_optimized = code_typed(test28079, (Ptr{Float32}, Int, Int); optimize=true)[].first
 @test cinfo_unoptimized.ssavaluetypes[end-1] === cinfo_optimized.ssavaluetypes[end-1] === Float32
+
+# issue #27907
+ig27907(T::Type, N::Integer, offsets...) = ig27907(T, T, N, offsets...)
+
+function ig27907(::Type{T}, ::Type, N::Integer, offsets...) where {T}
+    if length(offsets) < N
+        return typeof(ig27907(T, N, offsets..., 0))
+    else
+        return 0
+    end
+end
+
+@test ig27907(Int, Int, 1, 0) == 0
+
+# issue #28279
+function f28279(b::Bool)
+    i = 1
+    while i > b
+        i -= 1
+    end
+    if b end
+    return i + 1
+end
+code28279 = code_lowered(f28279, (Bool,))[1].code
+oldcode28279 = deepcopy(code28279)
+ssachangemap = fill(0, length(code28279))
+labelchangemap = fill(0, length(code28279))
+worklist = Int[]
+let i
+    for i in 1:length(code28279)
+        stmt = code28279[i]
+        if Meta.isexpr(stmt, :gotoifnot)
+            push!(worklist, i)
+            ssachangemap[i] = 1
+            if i < length(code28279)
+                labelchangemap[i + 1] = 1
+            end
+        end
+    end
+end
+Core.Compiler.renumber_ir_elements!(code28279, ssachangemap, labelchangemap)
+@test length(code28279) === length(oldcode28279)
+offset = 1
+let i
+    for i in 1:length(code28279)
+        if i == length(code28279)
+            @test Meta.isexpr(code28279[i], :return)
+            @test Meta.isexpr(oldcode28279[i], :return)
+            @test code28279[i].args[1].id == (oldcode28279[i].args[1].id + offset - 1)
+        elseif Meta.isexpr(code28279[i], :gotoifnot)
+            @test Meta.isexpr(oldcode28279[i], :gotoifnot)
+            @test code28279[i].args[1] == oldcode28279[i].args[1]
+            @test code28279[i].args[2] == (oldcode28279[i].args[2] + offset)
+            global offset += 1
+        else
+            @test code28279[i] == oldcode28279[i]
+        end
+    end
+end
+
+# issue #28356
+# unit test to make sure countunionsplit overflows gracefully
+# we don't care what number is returned as long as it's large
+@test Core.Compiler.countunionsplit(Any[Union{Int32,Int64} for i=1:80]) > 100000
+
+# make sure compiler doesn't hang in union splitting
+
+struct S28356{T<:Union{Float64,Float32}}
+x1::T
+x2::T
+x3::T
+x4::T
+x5::T
+x6::T
+x7::T
+x8::T
+x9::T
+x10::T
+x11::T
+x12::T
+x13::T
+x14::T
+x15::T
+x16::T
+x17::T
+x18::T
+x19::T
+x20::T
+x21::T
+x22::T
+x23::T
+x24::T
+x25::T
+x26::T
+x27::T
+x28::T
+x29::T
+x30::T
+x31::T
+x32::T
+x33::T
+x34::T
+x35::T
+x36::T
+x37::T
+x38::T
+x39::T
+x40::T
+x41::T
+x42::T
+x43::T
+x44::T
+x45::T
+x46::T
+x47::T
+x48::T
+x49::T
+x50::T
+x51::T
+x52::T
+x53::T
+x54::T
+x55::T
+x56::T
+x57::T
+x58::T
+x59::T
+x60::T
+x61::T
+x62::T
+x63::T
+x64::T
+x65::T
+x66::T
+x67::T
+x68::T
+x69::T
+x70::T
+x71::T
+x72::T
+x73::T
+x74::T
+x75::T
+x76::T
+x77::T
+x78::T
+x79::T
+x80::T
+end
+
+function f28356(::Type{T}) where {T<:Union{Float64,Float32}}
+    S28356(T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0),T(0))
+end
+
+h28356() = f28356(Any[Float64][1])
+
+@test h28356() isa S28356{Float64}
+
+# Issue #28444
+mutable struct foo28444
+    a::Int
+    b::Int
+end
+function bar28444()
+    a = foo28444(1, 2)
+    c, d = a.a, a.b
+    e = (c, d)
+    e[1]
+end
+@test bar28444() == 1
+
+# issue #28641
+struct VoxelIndices{T <: Integer}
+    voxCrnrPos::NTuple{8,NTuple{3,T}}
+    voxEdgeCrnrs::NTuple{19, NTuple{2,T}}
+    voxEdgeDir::NTuple{19,T}
+    voxEdgeIx::NTuple{8,NTuple{8,T}}
+    subTets::NTuple{6,NTuple{4,T}}
+    tetEdgeCrnrs::NTuple{6,NTuple{2,T}}
+    tetTri::NTuple{16,NTuple{6,T}}
+end
+f28641(x::VoxelIndices, f) = getfield(x, f)
+@test Base.return_types(f28641, (Any,Symbol)) == Any[Tuple]

@@ -391,18 +391,6 @@ JL_DLLEXPORT void jl_module_use(jl_module_t *to, jl_module_t *from, jl_sym_t *s)
     module_import_(to, from, s, 0);
 }
 
-JL_DLLEXPORT void jl_module_importall(jl_module_t *to, jl_module_t *from)
-{
-    void **table = from->bindings.table;
-    for(size_t i=1; i < from->bindings.size; i+=2) {
-        if (table[i] != HT_NOTFOUND) {
-            jl_binding_t *b = (jl_binding_t*)table[i];
-            if (b->exportp && (b->owner==from || b->imported))
-                jl_module_import(to, from, b->name);
-        }
-    }
-}
-
 JL_DLLEXPORT void jl_module_using(jl_module_t *to, jl_module_t *from)
 {
     if (to == from)
@@ -638,19 +626,6 @@ JL_DLLEXPORT void jl_declare_constant(jl_binding_t *b)
     b->constp = 1;
 }
 
-JL_DLLEXPORT jl_value_t *jl_get_current_module(void)
-{
-    jl_ptls_t ptls = jl_get_ptls_states();
-    return (jl_value_t*)ptls->current_module;
-}
-
-JL_DLLEXPORT void jl_set_current_module(jl_value_t *m)
-{
-    jl_ptls_t ptls = jl_get_ptls_states();
-    assert(jl_typeis(m, jl_module_type));
-    ptls->current_module = (jl_module_t*)m;
-}
-
 JL_DLLEXPORT jl_value_t *jl_module_usings(jl_module_t *m)
 {
     jl_array_t *a = jl_alloc_array_1d(jl_array_any_type, 0);
@@ -696,7 +671,7 @@ JL_DLLEXPORT jl_uuid_t jl_module_uuid(jl_module_t* m) { return m->uuid; }
 // TODO: make this part of the module constructor and read-only?
 JL_DLLEXPORT void jl_set_module_uuid(jl_module_t *m, jl_uuid_t uuid) { m->uuid = uuid; }
 
-int jl_is_submodule(jl_module_t *child, jl_module_t *parent)
+int jl_is_submodule(jl_module_t *child, jl_module_t *parent) JL_NOTSAFEPOINT
 {
     while (1) {
         if (parent == child)

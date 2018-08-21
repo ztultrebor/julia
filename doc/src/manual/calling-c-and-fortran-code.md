@@ -287,7 +287,7 @@ First, a review of some relevant Julia type terminology:
 | `struct ...; end`             | `nothing`                                   | "Singleton" :: a Leaf Type or Struct with no fields.                                                                                                                                                                                                                        |
 | `(...)` or `tuple(...)`       | `(1, 2, 3)`                                 | "Tuple" :: an immutable data-structure similar to an anonymous struct type, or a constant array. Represented as either an array or a struct.                                                                                                                                |
 
-### Bits Types:
+### [Bits Types](@id man-bits-types)
 
 There are several special types to be aware of, as no other type can be defined to behave the
 same:
@@ -374,7 +374,7 @@ an `Int` in Julia).
 | `va_arg`                                                |                          |                      | Not supported                                                                                                  |
 | `...` (variadic function specification)                 |                          |                      | `T...` (where `T` is one of the above types, variadic functions of different argument types are not supported) |
 
-The `Cstring` type is essentially a synonym for `Ptr{UInt8}`, except the conversion to `Cstring`
+The [`Cstring`](@ref) type is essentially a synonym for `Ptr{UInt8}`, except the conversion to `Cstring`
 throws an error if the Julia string contains any embedded NUL characters (which would cause the
 string to be silently truncated if the C routine treats NUL as the terminator).  If you are passing
 a `char*` to a C routine that does not assume NUL termination (e.g. because you pass an explicit
@@ -413,7 +413,7 @@ checks and is only meant to improve readability of the call.
     (`void`) but do return, use `Cvoid` instead.
 
 !!! note
-    For `wchar_t*` arguments, the Julia type should be `Cwstring` (if the C routine expects a NUL-terminated
+    For `wchar_t*` arguments, the Julia type should be [`Cwstring`](@ref) (if the C routine expects a NUL-terminated
     string) or `Ptr{Cwchar_t}` otherwise. Note also that UTF-8 string data in Julia is internally
     NUL-terminated, so it can be passed to C functions expecting NUL-terminated data without making
     a copy (but using the `Cwstring` type will cause an error to be thrown if the string itself contains
@@ -734,7 +734,7 @@ end
 ```
 
 The meaning of prefix `&` is not quite the same as in C. In particular, any changes to the referenced
-variables will not be visible in Julia unless the type is mutable (declared via `type`). However,
+variables will not be visible in Julia unless the type is mutable (declared via `mutable struct`). However,
 even for immutable structs it will not cause any harm for called functions to attempt such modifications
 (that is, writing through the passed pointers). Moreover, `&` may be used with any expression,
 such as `&0` or `&f(x)`.

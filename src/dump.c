@@ -60,7 +60,9 @@ static arraylist_t reinit_list;
 
 // list of stuff that is being serialized
 // (only used by the incremental serializer in MODE_MODULE)
-static jl_array_t *serializer_worklist;
+// This is not quite globally rooted, but we take care to only
+// ever assigned rooted values here.
+static jl_array_t *serializer_worklist JL_GLOBALLY_ROOTED;
 
 // inverse of backedges tree
 // (only used by the incremental serializer in MODE_MODULE)
@@ -149,6 +151,8 @@ typedef struct {
 
 static jl_value_t *jl_idtable_type = NULL;
 static jl_typename_t *jl_idtable_typename = NULL;
+static jl_value_t *jl_bigint_type = NULL;
+static int gmp_limb_size = 0;
 static arraylist_t builtin_typenames;
 
 #define write_uint8(s, n) ios_putc((n), (s))
@@ -158,48 +162,48 @@ static arraylist_t builtin_typenames;
 
 /* read and write in host byte order */
 
-static void write_int32(ios_t *s, int32_t i)
+static void write_int32(ios_t *s, int32_t i) JL_NOTSAFEPOINT
 {
     ios_write(s, (char*)&i, 4);
 }
 
-static int32_t read_int32(ios_t *s)
+static int32_t read_int32(ios_t *s) JL_NOTSAFEPOINT
 {
     int32_t x = 0;
     ios_read(s, (char*)&x, 4);
     return x;
 }
 
-static void write_uint64(ios_t *s, uint64_t i)
+static void write_uint64(ios_t *s, uint64_t i) JL_NOTSAFEPOINT
 {
     ios_write(s, (char*)&i, 8);
 }
 
-static uint64_t read_uint64(ios_t *s)
+static uint64_t read_uint64(ios_t *s) JL_NOTSAFEPOINT
 {
     uint64_t x = 0;
     ios_read(s, (char*)&x, 8);
     return x;
 }
 
-static void write_int64(ios_t *s, int64_t i)
+static void write_int64(ios_t *s, int64_t i) JL_NOTSAFEPOINT
 {
     ios_write(s, (char*)&i, 8);
 }
 
-static void write_uint16(ios_t *s, uint16_t i)
+static void write_uint16(ios_t *s, uint16_t i) JL_NOTSAFEPOINT
 {
     ios_write(s, (char*)&i, 2);
 }
 
-static uint16_t read_uint16(ios_t *s)
+static uint16_t read_uint16(ios_t *s) JL_NOTSAFEPOINT
 {
     int16_t x = 0;
     ios_read(s, (char*)&x, 2);
     return x;
 }
 
-static void write_float64(ios_t *s, double x)
+static void write_float64(ios_t *s, double x) JL_NOTSAFEPOINT
 {
     write_uint64(s, *((uint64_t*)&x));
 }
@@ -207,10 +211,10 @@ static void write_float64(ios_t *s, double x)
 // --- serialize ---
 
 #define jl_serialize_value(s, v) jl_serialize_value_((s), (jl_value_t*)(v), 0)
-static void jl_serialize_value_(jl_serializer_state *s, jl_value_t *v, int as_literal);
-static jl_value_t *jl_deserialize_value(jl_serializer_state *s, jl_value_t **loc);
+static void jl_serialize_value_(jl_serializer_state *s, jl_value_t *v, int as_literal) JL_GC_DISABLED;
+static jl_value_t *jl_deserialize_value(jl_serializer_state *s, jl_value_t **loc) JL_GC_DISABLED;
 
-static int module_in_worklist(jl_module_t *mod)
+static int module_in_worklist(jl_module_t *mod) JL_NOTSAFEPOINT
 {
     int i, l = jl_array_len(serializer_worklist);
     for (i = 0; i < l; i++) {
@@ -224,7 +228,7 @@ static int module_in_worklist(jl_module_t *mod)
 // compute whether a type references something internal to worklist
 // and thus could not have existed before deserialize
 // and thus does not need delayed unique-ing
-static int type_in_worklist(jl_datatype_t *dt)
+static int type_in_worklist(jl_datatype_t *dt) JL_NOTSAFEPOINT
 {
     if (module_in_worklist(dt->name->module))
         return 1;
@@ -239,7 +243,7 @@ static int type_in_worklist(jl_datatype_t *dt)
 
 static int type_recursively_external(jl_datatype_t *dt);
 
-static int type_parameter_recursively_external(jl_value_t *p0)
+static int type_parameter_recursively_external(jl_value_t *p0) JL_NOTSAFEPOINT
 {
     jl_datatype_t *p = (jl_datatype_t*)p0;
     while (jl_is_unionall(p)) {
@@ -261,7 +265,7 @@ static int type_parameter_recursively_external(jl_value_t *p0)
 }
 
 // returns true if all of the parameters are tag 6 or 7
-static int type_recursively_external(jl_datatype_t *dt)
+static int type_recursively_external(jl_datatype_t *dt) JL_NOTSAFEPOINT
 {
     if (dt->uid == 0)
         return 0;
@@ -277,7 +281,7 @@ static int type_recursively_external(jl_datatype_t *dt)
 }
 
 
-static void jl_serialize_datatype(jl_serializer_state *s, jl_datatype_t *dt)
+static void jl_serialize_datatype(jl_serializer_state *s, jl_datatype_t *dt) JL_GC_DISABLED
 {
     int tag = 0;
     int internal = module_in_worklist(dt->name->module);
@@ -458,7 +462,7 @@ static int is_ast_node(jl_value_t *v)
         jl_typeis(v, jl_lineinfonode_type);
 }
 
-static int literal_val_id(jl_serializer_state *s, jl_value_t *v)
+static int literal_val_id(jl_serializer_state *s, jl_value_t *v) JL_GC_DISABLED
 {
     jl_array_t *rs = s->method->roots;
     int i, l = jl_array_len(rs);
@@ -478,7 +482,7 @@ static int literal_val_id(jl_serializer_state *s, jl_value_t *v)
     return jl_array_len(rs) - 1;
 }
 
-static void jl_serialize_value_(jl_serializer_state *s, jl_value_t *v, int as_literal)
+static void jl_serialize_value_(jl_serializer_state *s, jl_value_t *v, int as_literal) JL_GC_DISABLED
 {
     if (v == NULL) {
         write_uint8(s->s, TAG_NULL);
@@ -649,9 +653,9 @@ static void jl_serialize_value_(jl_serializer_state *s, jl_value_t *v, int as_li
             jl_serialize_value(s, jl_box_long(jl_array_dim(ar,i)));
         jl_serialize_value(s, jl_typeof(ar));
         if (!ar->flags.ptrarray) {
-            size_t extra = jl_is_uniontype(jl_tparam0(jl_typeof(ar))) ? jl_array_len(ar) : 0;
-            size_t tot = jl_array_len(ar) * ar->elsize + extra;
-            ios_write(s->s, (char*)jl_array_data(ar), tot);
+            ios_write(s->s, (char*)jl_array_data(ar), jl_array_len(ar) * ar->elsize);
+            if (jl_array_isbitsunion(ar))
+                ios_write(s->s, jl_array_typetagdata(ar), jl_array_len(ar));
         }
         else {
             for (i = 0; i < jl_array_len(ar); i++) {
@@ -921,6 +925,17 @@ static void jl_serialize_value_(jl_serializer_state *s, jl_value_t *v, int as_li
         for (i = 0; i < jl_datatype_nfields(jl_lineinfonode_type); i++)
             jl_serialize_value(s, jl_get_nth_field(v, i));
     }
+    else if (jl_bigint_type && jl_typeis(v, jl_bigint_type)) {
+        write_uint8(s->s, TAG_SHORT_GENERAL);
+        write_uint8(s->s, jl_datatype_size(jl_bigint_type));
+        jl_serialize_value(s, jl_bigint_type);
+        jl_value_t *sizefield = jl_get_nth_field(v, 1);
+        jl_serialize_value(s, sizefield);
+        void *data = jl_unbox_voidpointer(jl_get_nth_field(v, 2));
+        int32_t sz = jl_unbox_int32(sizefield);
+        size_t nb = (sz == 0 ? 1 : (sz < 0 ? -sz : sz)) * gmp_limb_size;
+        ios_write(s->s, (char*)data, nb);
+    }
     else {
         jl_datatype_t *t = (jl_datatype_t*)jl_typeof(v);
         void *data = jl_data_ptr(v);
@@ -1012,7 +1027,7 @@ static void jl_serialize_value_(jl_serializer_state *s, jl_value_t *v, int as_li
                         if (!jl_field_isptr(t, i)) {
                             uint8_t sel = 0;
                             if (jl_is_uniontype(jl_field_type(t, i))) {
-                                sel = ((uint8_t*)v)[offs + fsz - 1];
+                                sel = ((uint8_t*)v)[offs + fsz - 1] + 1;
                             }
                             write_int8(s->s, sel);
                         }
@@ -1043,7 +1058,7 @@ static void jl_collect_missing_backedges_to_mod(jl_methtable_t *mt)
 
 // the intent of this function is to invert the backedges tree
 // for anything that points to a method not part of the worklist
-static void collect_backedges(jl_method_instance_t *callee)
+static void collect_backedges(jl_method_instance_t *callee) JL_GC_DISABLED
 {
     jl_array_t *backedges = callee->backedges;
     if (backedges) {
@@ -1062,7 +1077,7 @@ static void collect_backedges(jl_method_instance_t *callee)
 }
 
 
-static int jl_collect_backedges_to_mod(jl_typemap_entry_t *ml, void *closure)
+static int jl_collect_backedges_to_mod(jl_typemap_entry_t *ml, void *closure) JL_GC_DISABLED
 {
     (void)(jl_array_t*)closure;
     jl_method_instance_t *callee = ml->func.linfo;
@@ -1070,7 +1085,7 @@ static int jl_collect_backedges_to_mod(jl_typemap_entry_t *ml, void *closure)
     return 1;
 }
 
-static int jl_collect_methcache_from_mod(jl_typemap_entry_t *ml, void *closure)
+static int jl_collect_methcache_from_mod(jl_typemap_entry_t *ml, void *closure) JL_GC_DISABLED
 {
     jl_array_t *s = (jl_array_t*)closure;
     jl_method_t *m = ml->func.method;
@@ -1084,12 +1099,12 @@ static int jl_collect_methcache_from_mod(jl_typemap_entry_t *ml, void *closure)
     return 1;
 }
 
-static void jl_collect_methtable_from_mod(jl_array_t *s, jl_typename_t *tn)
+static void jl_collect_methtable_from_mod(jl_array_t *s, jl_typename_t *tn) JL_GC_DISABLED
 {
     jl_typemap_visitor(tn->mt->defs, jl_collect_methcache_from_mod, (void*)s);
 }
 
-static void jl_collect_lambdas_from_mod(jl_array_t *s, jl_module_t *m)
+static void jl_collect_lambdas_from_mod(jl_array_t *s, jl_module_t *m) JL_GC_DISABLED
 {
     if (module_in_worklist(m))
         return;
@@ -1125,7 +1140,7 @@ static void jl_collect_lambdas_from_mod(jl_array_t *s, jl_module_t *m)
 }
 
 // flatten the backedge map reachable from caller into callees
-static void jl_collect_backedges_to(jl_method_instance_t *caller, htable_t *all_callees)
+static void jl_collect_backedges_to(jl_method_instance_t *caller, htable_t *all_callees) JL_GC_DISABLED
 {
     jl_array_t **pcallees = (jl_array_t**)ptrhash_bp(&edges_map, (void*)caller),
                 *callees = *pcallees;
@@ -1232,7 +1247,7 @@ static void write_work_list(ios_t *s)
     write_int32(s, 0);
 }
 
-static void write_module_path(ios_t *s, jl_module_t *depmod)
+static void write_module_path(ios_t *s, jl_module_t *depmod) JL_NOTSAFEPOINT
 {
     if (depmod->parent == jl_main_module || depmod->parent == depmod)
         return;
@@ -1309,7 +1324,7 @@ static int64_t write_dependency_list(ios_t *s, jl_array_t **udepsp, jl_array_t *
 
 // --- deserialize ---
 
-static jl_value_t *jl_deserialize_datatype(jl_serializer_state *s, int pos, jl_value_t **loc)
+static jl_value_t *jl_deserialize_datatype(jl_serializer_state *s, int pos, jl_value_t **loc) JL_GC_DISABLED
 {
     int tag = read_uint8(s->s);
     if (tag == 6 || tag == 7) {
@@ -1441,7 +1456,7 @@ static jl_value_t *jl_deserialize_datatype(jl_serializer_state *s, int pos, jl_v
     return (jl_value_t*)dt;
 }
 
-static jl_value_t *jl_deserialize_value_svec(jl_serializer_state *s, uint8_t tag)
+static jl_value_t *jl_deserialize_value_svec(jl_serializer_state *s, uint8_t tag) JL_GC_DISABLED
 {
     int usetable = (s->mode != MODE_IR);
     size_t i, len;
@@ -1459,7 +1474,7 @@ static jl_value_t *jl_deserialize_value_svec(jl_serializer_state *s, uint8_t tag
     return (jl_value_t*)sv;
 }
 
-static jl_value_t *jl_deserialize_value_symbol(jl_serializer_state *s, uint8_t tag)
+static jl_value_t *jl_deserialize_value_symbol(jl_serializer_state *s, uint8_t tag) JL_GC_DISABLED
 {
     int usetable = (s->mode != MODE_IR);
     size_t len;
@@ -1478,7 +1493,7 @@ static jl_value_t *jl_deserialize_value_symbol(jl_serializer_state *s, uint8_t t
     return sym;
 }
 
-static jl_value_t *jl_deserialize_value_array(jl_serializer_state *s, uint8_t tag)
+static jl_value_t *jl_deserialize_value_array(jl_serializer_state *s, uint8_t tag) JL_GC_DISABLED
 {
     int usetable = (s->mode != MODE_IR);
     int16_t i, ndims;
@@ -1508,7 +1523,7 @@ static jl_value_t *jl_deserialize_value_array(jl_serializer_state *s, uint8_t ta
     jl_value_t *aty = jl_deserialize_value(s, &jl_astaggedvalue(a)->type);
     jl_set_typeof(a, aty);
     if (!a->flags.ptrarray) {
-        size_t extra = jl_is_uniontype(jl_tparam0(aty)) ? jl_array_len(a) : 0;
+        size_t extra = jl_array_isbitsunion(a) ? jl_array_len(a) : 0;
         size_t tot = jl_array_len(a) * a->elsize + extra;
         ios_read(s->s, (char*)jl_array_data(a), tot);
     }
@@ -1524,7 +1539,7 @@ static jl_value_t *jl_deserialize_value_array(jl_serializer_state *s, uint8_t ta
     return (jl_value_t*)a;
 }
 
-static jl_value_t *jl_deserialize_value_expr(jl_serializer_state *s, uint8_t tag)
+static jl_value_t *jl_deserialize_value_expr(jl_serializer_state *s, uint8_t tag) JL_GC_DISABLED
 {
     int usetable = (s->mode != MODE_IR);
     size_t i, len;
@@ -1558,7 +1573,7 @@ static jl_value_t *jl_deserialize_value_expr(jl_serializer_state *s, uint8_t tag
     return (jl_value_t*)e;
 }
 
-static jl_value_t *jl_deserialize_value_phi(jl_serializer_state *s, uint8_t tag)
+static jl_value_t *jl_deserialize_value_phi(jl_serializer_state *s, uint8_t tag) JL_GC_DISABLED
 {
     int usetable = (s->mode != MODE_IR);
     size_t i, len_e, len_v;
@@ -1585,7 +1600,7 @@ static jl_value_t *jl_deserialize_value_phi(jl_serializer_state *s, uint8_t tag)
     return phi;
 }
 
-static jl_value_t *jl_deserialize_value_phic(jl_serializer_state *s, uint8_t tag)
+static jl_value_t *jl_deserialize_value_phic(jl_serializer_state *s, uint8_t tag) JL_GC_DISABLED
 {
     int usetable = (s->mode != MODE_IR);
     size_t i, len;
@@ -1604,7 +1619,7 @@ static jl_value_t *jl_deserialize_value_phic(jl_serializer_state *s, uint8_t tag
     return phic;
 }
 
-static jl_value_t *jl_deserialize_value_method(jl_serializer_state *s, jl_value_t **loc)
+static jl_value_t *jl_deserialize_value_method(jl_serializer_state *s, jl_value_t **loc) JL_GC_DISABLED
 {
     int usetable = (s->mode != MODE_IR);
     jl_method_t *m =
@@ -1660,7 +1675,7 @@ static jl_value_t *jl_deserialize_value_method(jl_serializer_state *s, jl_value_
     return (jl_value_t*)m;
 }
 
-static jl_value_t *jl_deserialize_value_method_instance(jl_serializer_state *s, jl_value_t **loc)
+static jl_value_t *jl_deserialize_value_method_instance(jl_serializer_state *s, jl_value_t **loc) JL_GC_DISABLED
 {
     int usetable = (s->mode != MODE_IR);
     jl_method_instance_t *li =
@@ -1728,7 +1743,7 @@ static jl_value_t *jl_deserialize_value_method_instance(jl_serializer_state *s, 
     return (jl_value_t*)li;
 }
 
-static jl_value_t *jl_deserialize_value_module(jl_serializer_state *s)
+static jl_value_t *jl_deserialize_value_module(jl_serializer_state *s) JL_GC_DISABLED
 {
     int usetable = (s->mode != MODE_IR);
     uintptr_t pos = backref_list.len;
@@ -1788,7 +1803,7 @@ static jl_value_t *jl_deserialize_value_module(jl_serializer_state *s)
     return (jl_value_t*)m;
 }
 
-static jl_value_t *jl_deserialize_value_globalref(jl_serializer_state *s)
+static jl_value_t *jl_deserialize_value_globalref(jl_serializer_state *s) JL_GC_DISABLED
 {
     int usetable = (s->mode != MODE_IR);
     if (usetable) {
@@ -1806,7 +1821,7 @@ static jl_value_t *jl_deserialize_value_globalref(jl_serializer_state *s)
     }
 }
 
-static jl_value_t *jl_deserialize_value_singleton(jl_serializer_state *s, jl_value_t **loc)
+static jl_value_t *jl_deserialize_value_singleton(jl_serializer_state *s, jl_value_t **loc) JL_GC_DISABLED
 {
     if (s->mode == MODE_IR) {
         jl_datatype_t *dt = (jl_datatype_t*)jl_deserialize_value(s, NULL);
@@ -1818,16 +1833,21 @@ static jl_value_t *jl_deserialize_value_singleton(jl_serializer_state *s, jl_val
     if (s->mode == MODE_MODULE) {
         // TODO: optimize the case where the value can easily be obtained
         // from an external module (tag == 6) as dt->instance
-        assert(loc != NULL && loc != HT_NOTFOUND);
-        arraylist_push(&flagref_list, loc);
-        arraylist_push(&flagref_list, (void*)pos);
+        assert(loc != HT_NOTFOUND);
+        // if loc == NULL, then the caller can't provide the address where the instance will be
+        // stored. this happens if a field might store a 0-size value, but the field itself is
+        // not 0 size, e.g. `::Union{Int,Nothing}`
+        if (loc != NULL) {
+            arraylist_push(&flagref_list, loc);
+            arraylist_push(&flagref_list, (void*)pos);
+        }
     }
     jl_datatype_t *dt = (jl_datatype_t*)jl_deserialize_value(s, (jl_value_t**)HT_NOTFOUND); // no loc, since if dt is replaced, then dt->instance would be also
     jl_set_typeof(v, dt);
     return v;
 }
 
-static void jl_deserialize_struct(jl_serializer_state *s, jl_value_t *v, size_t startfield)
+static void jl_deserialize_struct(jl_serializer_state *s, jl_value_t *v, size_t startfield) JL_GC_DISABLED
 {
     jl_datatype_t *dt = (jl_datatype_t*)jl_typeof(v);
     size_t i, nf = jl_datatype_nfields(dt);
@@ -1869,7 +1889,7 @@ static void jl_deserialize_struct(jl_serializer_state *s, jl_value_t *v, size_t 
     }
 }
 
-static jl_value_t *jl_deserialize_typemap_entry(jl_serializer_state *s)
+static jl_value_t *jl_deserialize_typemap_entry(jl_serializer_state *s) JL_GC_DISABLED
 {
     int N = read_int32(s->s); int n = N;
     jl_value_t *te = jl_nothing;
@@ -1883,8 +1903,7 @@ static jl_value_t *jl_deserialize_typemap_entry(jl_serializer_state *s)
         jl_deserialize_struct(s, v, 1);
 #ifndef NDEBUG
         if (te->func.value && jl_typeis(te->func.value, jl_method_instance_type)) {
-            assert(((te->func.linfo->max_world == 0 &&
-                    te->func.linfo->min_world == 1) ||
+            assert(((te->max_world == 0 && te->min_world == 1) ||
                     (te->func.linfo->max_world >= te->max_world &&
                      te->func.linfo->min_world <= te->min_world)) &&
                    "corrupt typemap entry structure");
@@ -1897,7 +1916,7 @@ static jl_value_t *jl_deserialize_typemap_entry(jl_serializer_state *s)
     return te;
 }
 
-static jl_value_t *jl_deserialize_value_any(jl_serializer_state *s, uint8_t tag, jl_value_t **loc)
+static jl_value_t *jl_deserialize_value_any(jl_serializer_state *s, uint8_t tag, jl_value_t **loc) JL_GC_DISABLED
 {
     int usetable = (s->mode != MODE_IR);
     int32_t sz = (tag == TAG_SHORT_GENERAL ? read_uint8(s->s) : read_int32(s->s));
@@ -1926,13 +1945,24 @@ static jl_value_t *jl_deserialize_value_any(jl_serializer_state *s, uint8_t tag,
         int nby = jl_datatype_size(dt);
         ios_read(s->s, (char*)jl_data_ptr(v), nby);
     }
+    else if ((jl_value_t*)dt == jl_bigint_type) {
+        jl_value_t *sizefield = jl_deserialize_value(s, NULL);
+        int32_t sz = jl_unbox_int32(sizefield);
+        int32_t nw = (sz == 0 ? 1 : (sz < 0 ? -sz : sz));
+        size_t nb = nw * gmp_limb_size;
+        void *buf = jl_gc_counted_malloc(nb);
+        ios_read(s->s, (char*)buf, nb);
+        jl_set_nth_field(v, 0, jl_box_int32(nw));
+        jl_set_nth_field(v, 1, sizefield);
+        jl_set_nth_field(v, 2, jl_box_voidpointer(buf));
+    }
     else {
         jl_deserialize_struct(s, v, 0);
     }
     return v;
 }
 
-static jl_value_t *jl_deserialize_value(jl_serializer_state *s, jl_value_t **loc)
+static jl_value_t *jl_deserialize_value(jl_serializer_state *s, jl_value_t **loc) JL_GC_DISABLED
 {
     assert(!ios_eof(s->s));
     jl_value_t *v;
@@ -1958,9 +1988,12 @@ static jl_value_t *jl_deserialize_value(jl_serializer_state *s, jl_value_t **loc
         jl_value_t *bp = (jl_value_t*)backref_list.items[offs];
         assert(bp);
         if (isflagref && loc != HT_NOTFOUND) {
-            assert(loc != NULL);
-            arraylist_push(&flagref_list, loc);
-            arraylist_push(&flagref_list, (void*)(uintptr_t)-1);
+            if (loc != NULL) {
+                // as in jl_deserialize_value_singleton, the caller won't have a place to
+                // store this reference given a field type like Union{Int,Nothing}
+                arraylist_push(&flagref_list, loc);
+                arraylist_push(&flagref_list, (void*)(uintptr_t)-1);
+            }
         }
         return (jl_value_t*)bp;
     case TAG_METHODROOT:
@@ -2138,7 +2171,7 @@ static void jl_insert_methods(jl_array_t *list)
     }
 }
 
-static size_t lowerbound_dependent_world_set(size_t world, arraylist_t *dependent_worlds)
+static size_t lowerbound_dependent_world_set(size_t world, arraylist_t *dependent_worlds) JL_NOTSAFEPOINT
 {
     size_t i, l = dependent_worlds->len;
     if (world <= (size_t)dependent_worlds->items[l - 1])
@@ -2371,7 +2404,7 @@ static jl_array_t *jl_finalize_deserializer(jl_serializer_state *s, arraylist_t 
     return init_order;
 }
 
-static void jl_init_restored_modules(jl_array_t *init_order)
+JL_DLLEXPORT void jl_init_restored_modules(jl_array_t *init_order)
 {
     if (!init_order)
         return;
@@ -2632,6 +2665,11 @@ JL_DLLEXPORT int jl_save_incremental(const char *fname, jl_array_t *worklist)
     backref_table_numel = 1;
     jl_idtable_type = jl_base_module ? jl_get_global(jl_base_module, jl_symbol("IdDict")) : NULL;
     jl_idtable_typename = jl_base_module ? ((jl_datatype_t*)jl_unwrap_unionall((jl_value_t*)jl_idtable_type))->name : NULL;
+    jl_bigint_type = jl_base_module ? jl_get_global(jl_base_module, jl_symbol("BigInt")) : NULL;
+    if (jl_bigint_type) {
+        gmp_limb_size = jl_unbox_long(jl_get_global((jl_module_t*)jl_get_global(jl_base_module, jl_symbol("GMP")),
+                                                    jl_symbol("BITS_PER_LIMB"))) / 8;
+    }
 
     int en = jl_gc_enable(0); // edges map is not gc-safe
     jl_array_t *lambdas = jl_alloc_vec_any(0);
@@ -2729,7 +2767,7 @@ static int jl_invalid_types_equal(jl_datatype_t *a, jl_datatype_t *b)
 }
 #endif
 
-static jl_datatype_t *jl_recache_type(jl_datatype_t *dt, size_t start, jl_value_t *v)
+static jl_datatype_t *jl_recache_type(jl_datatype_t *dt, size_t start, jl_value_t *v) JL_GC_DISABLED
 {
     if (v == NULL)
         v = dt->instance; // the instance before unique'ing
@@ -2798,6 +2836,7 @@ static jl_datatype_t *jl_recache_type(jl_datatype_t *dt, size_t start, jl_value_
         }
         else if (v == o) {
             if (t->instance != v) {
+                assert(loc);
                 *loc = t->instance;
                 if (offs > 0)
                     backref_list.items[offs] = t->instance;
@@ -2817,7 +2856,7 @@ static jl_datatype_t *jl_recache_type(jl_datatype_t *dt, size_t start, jl_value_
     return t;
 }
 
-static void jl_recache_types(void)
+static void jl_recache_types(void) JL_GC_DISABLED
 {
     size_t i = 0;
     while (i < flagref_list.len) {
@@ -2855,6 +2894,7 @@ static void jl_recache_types(void)
             if (t->instance != v) {
                 jl_set_typeof(v, (void*)(intptr_t)0x20); // invalidate the old value to help catch errors
                 if (v == o) {
+                    assert(loc);
                     *loc = t->instance;
                     if (offs > 0)
                         backref_list.items[offs] = t->instance;
@@ -3009,6 +3049,12 @@ static jl_value_t *_jl_restore_incremental(ios_t *f, jl_array_t *mod_array)
         ios_skip(f, deplen);
     }
 
+    jl_bigint_type = jl_base_module ? jl_get_global(jl_base_module, jl_symbol("BigInt")) : NULL;
+    if (jl_bigint_type) {
+        gmp_limb_size = jl_unbox_long(jl_get_global((jl_module_t*)jl_get_global(jl_base_module, jl_symbol("GMP")),
+                                                    jl_symbol("BITS_PER_LIMB"))) / 8;
+    }
+
     // list of world counters of incremental dependencies
     arraylist_t dependent_worlds;
     arraylist_new(&dependent_worlds, 0);
@@ -3076,10 +3122,10 @@ static jl_value_t *_jl_restore_incremental(ios_t *f, jl_array_t *mod_array)
         arraylist_free(tracee_list);
         free(tracee_list);
     }
-    jl_init_restored_modules(init_order);
+    jl_value_t *ret = (jl_value_t*)jl_svec(2, restored, init_order);
     JL_GC_POP();
 
-    return (jl_value_t*)restored;
+    return (jl_value_t*)ret;
 }
 
 JL_DLLEXPORT jl_value_t *jl_restore_incremental_from_buf(const char *buf, size_t sz, jl_array_t *mod_array)
@@ -3138,7 +3184,7 @@ void jl_init_serializer(void)
                      jl_pointer_type, jl_vararg_type, jl_abstractarray_type, jl_void_type,
                      jl_densearray_type, jl_function_type, jl_typename_type,
                      jl_builtin_type, jl_task_type, jl_uniontype_type, jl_typetype_type,
-                     jl_ANY_flag, jl_array_any_type, jl_intrinsic_type,
+                     jl_array_any_type, jl_intrinsic_type,
                      jl_abstractslot_type, jl_methtable_type, jl_typemap_level_type,
                      jl_voidpointer_type, jl_newvarnode_type, jl_abstractstring_type,
                      jl_array_symbol_type, jl_anytuple_type, jl_tparam0(jl_anytuple_type),

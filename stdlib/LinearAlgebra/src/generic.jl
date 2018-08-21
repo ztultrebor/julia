@@ -467,7 +467,7 @@ julia> norm(-2, Inf)
 ```
 """
 @inline norm(x::Number, p::Real=2) = p == 0 ? (x==0 ? zero(abs(x)) : oneunit(abs(x))) : abs(x)
-
+norm(::Missing, p::Real=2) = missing
 
 # special cases of opnorm
 function opnorm1(A::AbstractMatrix{T}) where T
@@ -1274,7 +1274,7 @@ julia> logabsdet(B)
 (0.6931471805599453, 1.0)
 ```
 """
-logabsdet(A::AbstractMatrix) = logabsdet(lu(A))
+logabsdet(A::AbstractMatrix) = logabsdet(lu(A, check=false))
 
 """
     logdet(M)

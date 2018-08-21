@@ -1,7 +1,5 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
-__precompile__(true)
-
 """
 Linear algebra module. Provides array arithmetic,
 matrix factorizations and other linear algebra related
@@ -62,7 +60,6 @@ export
     axpby!,
     bunchkaufman,
     bunchkaufman!,
-    chol,
     cholesky,
     cholesky!,
     cond,
@@ -136,7 +133,6 @@ export
     tr,
     transpose,
     transpose!,
-    transpose_type,
     tril,
     triu,
     tril!,
@@ -332,8 +328,6 @@ copy_oftype(A::AbstractArray{T,N}, ::Type{S}) where {T,N,S} = convert(AbstractAr
 
 include("adjtrans.jl")
 include("transpose.jl")
-include("conjarray.jl")
-include("rowvector.jl")
 
 include("exceptions.jl")
 include("generic.jl")

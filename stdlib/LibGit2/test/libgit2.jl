@@ -7,8 +7,8 @@ using Test
 using Random, Serialization, Sockets
 
 const BASE_TEST_PATH = joinpath(Sys.BINDIR, "..", "share", "julia", "test")
-isdefined(Main, :TestHelpers) || @eval Main include(joinpath($(BASE_TEST_PATH), "TestHelpers.jl"))
-import .Main.TestHelpers: with_fake_pty
+isdefined(Main, :FakePTYs) || @eval Main include(joinpath($(BASE_TEST_PATH), "testhelpers", "FakePTYs.jl"))
+import .Main.FakePTYs: with_fake_pty
 
 function challenge_prompt(code::Expr, challenges; timeout::Integer=60, debug::Bool=true)
     input_code = tempname()
@@ -1610,7 +1610,7 @@ mktempdir() do dir
             rb = LibGit2.GitRebase(repo, head_ann, upst_ann)
             @test_throws BoundsError rb[3]
             @test_throws BoundsError rb[0]
-            rbo = next(rb)
+            rbo, _ = iterate(rb)
             rbo_str = sprint(show, rbo)
             @test rbo_str == "RebaseOperation($(string(rbo.id)))\nOperation type: REBASE_OPERATION_PICK\n"
             rb_str = sprint(show, rb)
@@ -1734,14 +1734,43 @@ mktempdir() do dir
         @test haskey(cache, cred_id)
         @test cache[cred_id] === cred
 
-        # Reject an approved should cause it to be removed
-        LibGit2.reject(cache, cred, url)
+        # Approve the same credential again which does not overwrite
+        LibGit2.approve(cache, cred, url)
+        @test haskey(cache, cred_id)
+        @test cache[cred_id] === cred
+
+        # Overwrite an already cached credential
+        dup_cred = deepcopy(cred)
+        LibGit2.approve(cache, dup_cred, url)  # Shreds overwritten `cred`
+        @test haskey(cache, cred_id)
+        @test cache[cred_id] === dup_cred
+        @test cred.user != "julia"
+        @test cred.pass != password
+        @test dup_cred.user == "julia"
+        @test dup_cred.pass == password
+
+        cred = dup_cred
+
+        # Reject an approved credential
+        @test cache[cred_id] === cred
+        LibGit2.reject(cache, cred, url)  # Avoids shredding the credential passed in
         @test !haskey(cache, cred_id)
         @test cred.user == "julia"
         @test cred.pass == password
 
+        # Reject and shred an approved credential
+        dup_cred = deepcopy(cred)
+        LibGit2.approve(cache, cred, url)
+
+        LibGit2.reject(cache, dup_cred, url)  # Shred `cred` but not passed in `dup_cred`
+        @test !haskey(cache, cred_id)
+        @test cred.user != "julia"
+        @test cred.pass != password
+        @test dup_cred.user == "julia"
+        @test dup_cred.pass == password
+
+        Base.shred!(dup_cred)
         Base.shred!(cache)
-        Base.shred!(cred)
         Base.shred!(password)
     end
 

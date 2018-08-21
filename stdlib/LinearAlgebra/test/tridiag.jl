@@ -22,9 +22,9 @@ end
 
 @testset for elty in (Float32, Float64, ComplexF32, ComplexF64, Int)
     n = 12 #Size of matrix problem to test
-    srand(123)
+    Random.seed!(123)
     if elty == Int
-        srand(61516384)
+        Random.seed!(61516384)
         d = rand(1:100, n)
         dl = -rand(0:10, n-1)
         du = -rand(0:10, n-1)
@@ -80,13 +80,12 @@ end
         @test isa(ST, SymTridiagonal{elty,Vector{elty}})
         TT = Tridiagonal{elty,Vector{elty}}(GenericArray(dl), d, GenericArray(dl))
         @test isa(TT, Tridiagonal{elty,Vector{elty}})
-        # enable when deprecations for 0.7 are dropped
-        # @test_throws MethodError SymTridiagonal(dv, GenericArray(ev))
-        # @test_throws MethodError SymTridiagonal(GenericArray(dv), ev)
-        # @test_throws MethodError Tridiagonal(GenericArray(ev), dv, GenericArray(ev))
-        # @test_throws MethodError Tridiagonal(ev, GenericArray(dv), ev)
-        # @test_throws MethodError SymTridiagonal{elty}(dv, GenericArray(ev))
-        # @test_throws MethodError Tridiagonal{elty}(GenericArray(ev), dv, GenericArray(ev))
+        @test_throws MethodError SymTridiagonal(d, GenericArray(dl))
+        @test_throws MethodError SymTridiagonal(GenericArray(d), dl)
+        @test_throws MethodError Tridiagonal(GenericArray(dl), d, GenericArray(dl))
+        @test_throws MethodError Tridiagonal(dl, GenericArray(d), dl)
+        @test_throws MethodError SymTridiagonal{elty}(d, GenericArray(dl))
+        @test_throws MethodError Tridiagonal{elty}(GenericArray(dl), d,GenericArray(dl))
         STI = SymTridiagonal([1,2,3,4], [1,2,3])
         TTI = Tridiagonal([1,2,3], [1,2,3,4], [1,2,3])
         TTI2 = Tridiagonal([1,2,3], [1,2,3,4], [1,2,3], [1,2])

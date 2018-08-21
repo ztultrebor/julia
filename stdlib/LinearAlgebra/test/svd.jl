@@ -29,6 +29,8 @@ using LinearAlgebra: BlasComplex, BlasFloat, BlasReal, QRPivoted
     # matrices from the factorization as expected.
     @test sf1.U*Diagonal(sf1.S)*sf1.Vt' ≊ m1
     @test sf2.U*Diagonal(sf2.S)*sf2.Vt' ≊ m2
+
+    @test ldiv!([0., 0.], svd(Matrix(I, 2, 2)), [1., 1.]) ≊ [1., 1.]
 end
 
 n = 10
@@ -37,7 +39,7 @@ n = 10
 n1 = div(n, 2)
 n2 = 2*n1
 
-srand(1234321)
+Random.seed!(1234321)
 
 areal = randn(n,n)/2
 aimg  = randn(n,n)/2

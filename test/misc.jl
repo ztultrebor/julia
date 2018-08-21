@@ -102,7 +102,7 @@ let l = ReentrantLock()
             @test false
         end === false
     end
-    Base._wait(t)
+    Base.wait(t)
     unlock(l)
     @test_throws ErrorException unlock(l)
 end
@@ -112,9 +112,9 @@ end
 @noinline function f6597(c)
     t = @async nothing
     finalizer(t -> c[] += 1, t)
-    Base._wait(t)
+    Base.wait(t)
     @test c[] == 0
-    Base._wait(t)
+    Base.wait(t)
     nothing
 end
 let c = Ref(0),
@@ -677,4 +677,12 @@ end
 
     # Just checking that this doesn't stack overflow on construction
     @test Test27970Empty() == Test27970Empty()
+end
+
+@testset "exports of modules" begin
+    for (_, mod) in Base.loaded_modules
+       for v in names(mod)
+           @test isdefined(mod, v)
+       end
+   end
 end

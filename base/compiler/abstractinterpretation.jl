@@ -6,8 +6,6 @@
 
 const CoreNumType = Union{Int32, Int64, Float32, Float64}
 
-const DEPRECATED_SYM = Symbol("deprecated.jl")
-
 const _REF_NAME = Ref.body.name
 
 #########
@@ -129,8 +127,11 @@ function abstract_call_method_with_const_args(@nospecialize(f), argtypes::Vector
         a = maybe_widen_conditional(a)
         if isa(a, Const) && !isdefined(typeof(a.val), :instance) && !(isa(a.val, Type) && issingletontype(a.val))
             # have new information from argtypes that wasn't available from the signature
-            haveconst = true
-            break
+            if isa(a.val, Symbol) || isa(a.val, Type) || (!isa(a.val, String) && isimmutable(a.val))
+                # don't consider mutable values or Strings useful constants
+                haveconst = true
+                break
+            end
         end
     end
     haveconst || return Any
@@ -196,10 +197,6 @@ function abstract_call_method_with_const_args(@nospecialize(f), argtypes::Vector
 end
 
 function abstract_call_method(method::Method, @nospecialize(sig), sparams::SimpleVector, sv::InferenceState)
-    # TODO: remove with 0.7 deprecations
-    if method.file === DEPRECATED_SYM && method.sig == (Tuple{Type{T},Any} where T)
-        return Any, false, nothing
-    end
     if method.name === :depwarn && isdefined(Main, :Base) && method.module === Main.Base
         return Any, false, nothing
     end
@@ -252,7 +249,7 @@ function abstract_call_method(method::Method, @nospecialize(sig), sparams::Simpl
                         parent = parent::InferenceState
                         parent_method2 = parent.src.method_for_inference_limit_heuristics # limit only if user token match
                         parent_method2 isa Method || (parent_method2 = nothing) # Union{Method, Nothing}
-                        if parent.cached && parent.linfo.def === sv.linfo.def && sv_method2 === parent_method2
+                        if (parent.cached || parent.limited) && parent.linfo.def === sv.linfo.def && sv_method2 === parent_method2
                             topmost = infstate
                             edgecycle = true
                         end
@@ -308,10 +305,26 @@ function abstract_call_method(method::Method, @nospecialize(sig), sparams::Simpl
     # if sig changed, may need to recompute the sparams environment
     if isa(method.sig, UnionAll) && isempty(sparams)
         recomputed = ccall(:jl_type_intersection_with_env, Any, (Any, Any), sig, method.sig)::SimpleVector
-        sig = recomputed[1]
-        if !isa(unwrap_unionall(sig), DataType) # probably Union{}
-            return Any, false, nothing
-        end
+        #@assert recomputed[1] !== Bottom
+        # We must not use `sig` here, since that may re-introduce structural complexity that
+        # our limiting heuristic sought to eliminate. The alternative would be to not increment depth over covariant contexts,
+        # but we prefer to permit inference of tuple-destructuring, so we don't do that right now
+        # For example, with a signature such as `Tuple{T, Ref{T}} where {T <: S}`
+        # we might want to limit this to `Tuple{S, Ref}`, while type-intersection can instead give us back the original type
+        # (which moves `S` back up to a lower comparison depth)
+        # Optionally, we could try to drive this to a fixed point, but I think this is getting too complex,
+        # and this would only cause more questions and more problems
+        # (the following is only an example, most of the statements are probable in the wrong order):
+        #     newsig = sig
+        #     seen = IdSet()
+        #     while !(newsig in seen)
+        #         push!(seen, newsig)
+        #         lsig = length((unwrap_unionall(sig)::DataType).parameters)
+        #         newsig = limit_type_size(newsig, sig, sv.linfo.specTypes, sv.params.TUPLE_COMPLEXITY_LIMIT_DEPTH, lsig)
+        #         recomputed = ccall(:jl_type_intersection_with_env, Any, (Any, Any), newsig, method.sig)::SimpleVector
+        #         newsig = recomputed[2]
+        #     end
+        #     sig = ?
         sparams = recomputed[2]::SimpleVector
     end
 

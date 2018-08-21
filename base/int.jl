@@ -553,14 +553,45 @@ floor(::Type{T}, x::Integer) where {T<:Integer} = convert(T, x)
 
 ## integer construction ##
 
+"""
+    @int128_str str
+    @int128_str(str)
+
+`@int128_str` parses a string into a Int128
+Throws an `ArgumentError` if the string is not a valid integer
+"""
 macro int128_str(s)
     return parse(Int128, s)
 end
 
+"""
+    @uint128_str str
+    @uint128_str(str)
+
+`@uint128_str` parses a string into a UInt128
+Throws an `ArgumentError` if the string is not a valid integer
+"""
 macro uint128_str(s)
     return parse(UInt128, s)
 end
 
+"""
+    @big_str str
+    @big_str(str)
+
+Parse a string into a [`BigInt`](@ref) or [`BigFloat`](@ref),
+and throw an `ArgumentError` if the string is not a valid number.
+For integers `_` is allowed in the string as a separator.
+
+# Examples
+```jldoctest
+julia> big"123_456"
+123456
+
+julia> big"7891.5"
+7.8915e+03
+```
+"""
 macro big_str(s)
     if '_' in s
         # remove _ in s[2:end-1]

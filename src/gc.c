@@ -851,11 +851,12 @@ void jl_gc_reset_alloc_count(void)
 static size_t array_nbytes(jl_array_t *a)
 {
     size_t sz = 0;
-    if (jl_array_ndims(a)==1)
-        sz = a->elsize * a->maxsize + (a->elsize == 1 ? 1 : 0);
+    int isbitsunion = jl_array_isbitsunion(a);
+    if (jl_array_ndims(a) == 1)
+        sz = a->elsize * a->maxsize + ((a->elsize == 1 && !isbitsunion) ? 1 : 0);
     else
         sz = a->elsize * jl_array_len(a);
-    if (!a->flags.ptrarray && jl_is_uniontype(jl_tparam0(jl_typeof(a))))
+    if (isbitsunion)
         // account for isbits Union array selector bytes
         sz += jl_array_len(a);
     return sz;
@@ -2266,7 +2267,6 @@ static void mark_roots(jl_gc_mark_cache_t *gc_cache, gc_mark_sp_t *sp)
     if (jl_cfunction_list != NULL)
         gc_mark_queue_obj(gc_cache, sp, jl_cfunction_list);
     gc_mark_queue_obj(gc_cache, sp, jl_anytuple_type_type);
-    gc_mark_queue_obj(gc_cache, sp, jl_ANY_flag);
     for (size_t i = 0; i < N_CALL_CACHE; i++)
         if (call_cache[i])
             gc_mark_queue_obj(gc_cache, sp, call_cache[i]);

@@ -7,8 +7,8 @@ import REPL.LineEdit
 using Markdown
 
 const BASE_TEST_PATH = joinpath(Sys.BINDIR, "..", "share", "julia", "test")
-isdefined(Main, :TestHelpers) || @eval Main include(joinpath($(BASE_TEST_PATH), "TestHelpers.jl"))
-import .Main.TestHelpers
+isdefined(Main, :FakePTYs) || @eval Main include(joinpath($(BASE_TEST_PATH), "testhelpers", "FakePTYs.jl"))
+import .Main.FakePTYs: with_fake_pty
 
 # For curmod_*
 include(joinpath(BASE_TEST_PATH, "testenv.jl"))
@@ -58,7 +58,7 @@ function fake_repl(@nospecialize(f); options::REPL.Options=REPL.Options(confirm_
     end
     @test read(err.out, String) == ""
     #display(read(output.out, String))
-    Base._wait(t)
+    Base.wait(t)
     close(hard_kill)
     nothing
 end
@@ -300,7 +300,7 @@ fake_repl() do stdin_write, stdout_read, repl
 
     # Close REPL ^D
     write(stdin_write, '\x04')
-    Base._wait(repltask)
+    Base.wait(repltask)
 
     nothing
 end
@@ -671,7 +671,7 @@ fake_repl() do stdin_write, stdout_read, repl
 
     # Close repl
     write(stdin_write, '\x04')
-    Base._wait(repltask)
+    Base.wait(repltask)
 end
 
 # Simple non-standard REPL tests
@@ -711,7 +711,7 @@ fake_repl() do stdin_write, stdout_read, repl
     @test wait(c) == "a"
     # Close REPL ^D
     write(stdin_write, '\x04')
-    Base._wait(repltask)
+    Base.wait(repltask)
 end
 
 ccall(:jl_exit_on_sigint, Cvoid, (Cint,), 1)
@@ -719,7 +719,7 @@ ccall(:jl_exit_on_sigint, Cvoid, (Cint,), 1)
 let exename = Base.julia_cmd()
     # Test REPL in dumb mode
     if !Sys.iswindows()
-        TestHelpers.with_fake_pty() do slave, master
+        with_fake_pty() do slave, master
             nENV = copy(ENV)
             nENV["TERM"] = "dumb"
             p = run(setenv(`$exename --startup-file=no -q`,nENV),slave,slave,slave,wait=false)
@@ -882,7 +882,7 @@ for keys = [altkeys, merge(altkeys...)],
 
             # Close REPL ^D
             write(stdin_write, '\x04')
-            Base._wait(repltask)
+            Base.wait(repltask)
 
             # Close the history file
             # (otherwise trying to delete it fails on Windows)
@@ -938,7 +938,7 @@ fake_repl() do stdin_write, stdout_read, repl
 
     # Close REPL ^D
     write(stdin_write, '\x04')
-    Base._wait(repltask)
+    Base.wait(repltask)
 end
 
 # Docs.helpmode tests: we test whether the correct expressions are being generated here,
@@ -975,5 +975,5 @@ fake_repl() do stdin_write, stdout_read, repl
     readline(stdout_read)
     @test readline(stdout_read) == "\e[0m:((Base.Math.float)(_1))"
     write(stdin_write, '\x04')
-    Base._wait(repltask)
+    Base.wait(repltask)
 end

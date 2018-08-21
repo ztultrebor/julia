@@ -65,6 +65,15 @@ and a global configuration search path of
 /etc/julia/startup.jl
 ```
 
+### `JULIA_PROJECT`
+
+A directory path that points to the current Julia project. Setting this
+environment variable has the same effect as specifying the `--project` start-up
+option, but `--project` has higher precedence.  If the variable is set to `@.`,
+Julia tries to find a project directory that contains `Project.toml` or
+`JuliaProject.toml` file from the current directory and its parents.  See also
+the chapter on [Code Loading](@ref).
+
 ### `JULIA_LOAD_PATH`
 
 A separated list of absolute paths that are to be appended to the variable
@@ -120,11 +129,6 @@ referring to the command of the preferred editor, for instance `vim`.
 over `$EDITOR`. If none of these environment variables is set, then the editor
 is taken to be `open` on Windows and OS X, or `/etc/alternatives/editor` if it
 exists, or `emacs` otherwise.
-
-!!! note
-
-    `$JULIA_EDITOR` is *not* used in the determination of the editor for
-    `OldPkg.edit`: this function checks `$VISUAL` and `$EDITOR` alone.
 
 ## Parallelization
 

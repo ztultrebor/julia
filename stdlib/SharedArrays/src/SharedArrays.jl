@@ -1,7 +1,5 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
-__precompile__(true)
-
 """
 Provide the [`SharedArray`](@ref) type. It represents an array, which is shared across multiple processes, on a single machine.
 """
@@ -687,15 +685,5 @@ shm_open(shm_seg_name, oflags, permissions) = ccall(:shm_open, Cint,
     (Cstring, Cint, Base.Cmode_t), shm_seg_name, oflags, permissions)
 
 end # os-test
-
-# 0.7 deprecations
-
-@deprecate SharedArray(::Type{T}, dims::Dims{N}; kwargs...) where {T,N} SharedArray{T}(dims; kwargs...)
-@deprecate SharedArray(::Type{T}, dims::Int...; kwargs...) where {T}    SharedArray{T}(dims...; kwargs...)
-@deprecate(SharedArray(filename::AbstractString, ::Type{T}, dims::NTuple{N,Int}, offset; kwargs...) where {T,N},
-           SharedArray{T}(filename, dims, offset; kwargs...))
-@deprecate(SharedArray(filename::AbstractString, ::Type{T}, dims::NTuple, offset; kwargs...) where {T},
-           SharedArray{T}(filename, dims, offset; kwargs...))
-@deprecate localindexes localindices
 
 end # module

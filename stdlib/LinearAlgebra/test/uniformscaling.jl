@@ -4,7 +4,7 @@ module TestUniformscaling
 
 using Test, LinearAlgebra, Random, SparseArrays
 
-srand(123)
+Random.seed!(123)
 
 @testset "basic functions" begin
     @test I[1,1] == 1 # getindex
@@ -254,6 +254,12 @@ end
 @testset "test that UniformScaling is applied correctly for matrices of matrices" begin
     LL = Bidiagonal(fill(0*I, 3), fill(1*I, 2), :L)
     @test (I - LL')\[[0], [0], [1]] == (I - LL)'\[[0], [0], [1]] == fill([1], 3)
+end
+
+# Ensure broadcasting of I is an error (could be made to work in the future)
+@testset "broadcasting of I (#23197)" begin
+    @test_throws MethodError I .+ 1
+    @test_throws MethodError I .+ [1 1; 1 1]
 end
 
 end # module TestUniformscaling

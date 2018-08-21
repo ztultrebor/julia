@@ -26,6 +26,10 @@ Core.DenseArray
 Base.DenseVector
 Base.DenseMatrix
 Base.DenseVecOrMat
+Base.StridedArray
+Base.StridedVector
+Base.StridedMatrix
+Base.StridedVecOrMat
 Base.getindex(::Type, ::Any...)
 Base.zeros
 Base.ones
@@ -49,6 +53,8 @@ Base.axes(::AbstractArray, ::Any)
 Base.length(::AbstractArray)
 Base.eachindex
 Base.IndexStyle
+Base.IndexLinear
+Base.IndexCartesian
 Base.conj!
 Base.stride
 Base.strides
@@ -105,7 +111,7 @@ Base.parentindices
 Base.selectdim
 Base.reinterpret
 Base.reshape
-Base.squeeze
+Base.dropdims
 Base.vec
 ```
 

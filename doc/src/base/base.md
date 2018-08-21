@@ -162,8 +162,8 @@ Base.datatype_pointerfree
 ```@docs
 Base.typemin
 Base.typemax
-Base.realmin
-Base.realmax
+Base.floatmin
+Base.floatmax
 Base.maxintfloat
 Base.eps(::Type{<:AbstractFloat})
 Base.eps(::AbstractFloat)
@@ -220,6 +220,8 @@ Base.@goto
 Base.@label
 Base.@simd
 Base.@polly
+Base.@generated
+Base.@pure
 ```
 
 ## Missing Values
@@ -242,7 +244,6 @@ Base.process_exited
 Base.kill(::Base.Process, ::Integer)
 Base.Sys.set_process_title
 Base.Sys.get_process_title
-Base.readandwrite
 Base.ignorestatus
 Base.detach
 Base.Cmd
@@ -330,6 +331,7 @@ Base.AsyncCondition(::Function)
 ```@docs
 Base.nameof(::Module)
 Base.parentmodule
+Base.pathof(::Module)
 Base.moduleroot
 Base.@__MODULE__
 Base.fullname

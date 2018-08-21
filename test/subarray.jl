@@ -24,7 +24,7 @@ function Agen_slice(A::AbstractArray, I...)
             push!(sd, i)
         end
     end
-    squeeze(B, dims=sd)
+    dropdims(B, dims=sd)
 end
 
 _Agen(A, i1) = [A[j1] for j1 in i1]
@@ -163,17 +163,16 @@ function test_bounds(@nospecialize(A))
     @test_throws BoundsError A[end+1, 1, 1, trailing3...]
     @test_throws BoundsError A[1, 0, 1, trailing3...]
     @test_throws BoundsError A[1, end+1, 1, trailing3...]
-    # TODO: PLI (re-enable after 0.7)
-    # @test_throws BoundsError A[1, 0]
-    # @test_throws BoundsError A[1, end+1]
-    # @test_throws BoundsError A[1, 1, 0]
-    # @test_throws BoundsError A[1, 1, end+1]
-    # @test_throws BoundsError A[0, 1]
-    # @test_throws BoundsError A[end+1, 1]
-    # @test_throws BoundsError A[0, 1, 1]
-    # @test_throws BoundsError A[end+1, 1, 1]
-    # @test_throws BoundsError A[1, 0, 1]
-    # @test_throws BoundsError A[1, end+1, 1]
+    @test_throws BoundsError A[1, 0]
+    @test_throws BoundsError A[1, end+1]
+    @test_throws BoundsError A[1, 1, 0]
+    @test_throws BoundsError A[1, 1, end+1]
+    @test_throws BoundsError A[0, 1]
+    @test_throws BoundsError A[end+1, 1]
+    @test_throws BoundsError A[0, 1, 1]
+    @test_throws BoundsError A[end+1, 1, 1]
+    @test_throws BoundsError A[1, 0, 1]
+    @test_throws BoundsError A[1, end+1, 1]
 end
 
 function dim_break_linindex(I)

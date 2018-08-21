@@ -254,8 +254,7 @@ function isdefined_tfunc(@nospecialize(args...))
     end
     a1 = unwrap_unionall(a1)
     if isa(a1, DataType) && !a1.abstract
-        if a1 <: Array # TODO update when deprecation is removed
-        elseif a1 === Module
+        if a1 === Module
             length(args) == 2 || return Bottom
             sym = args[2]
             Symbol <: widenconst(sym) || return Bottom
@@ -289,8 +288,8 @@ function isdefined_tfunc(@nospecialize(args...))
     end
     Bool
 end
-# TODO change INT_INF to 2 when deprecation is removed
-add_tfunc(isdefined, 1, INT_INF, isdefined_tfunc, 1)
+
+add_tfunc(isdefined, 1, 2, isdefined_tfunc, 1)
 function sizeof_nothrow(@nospecialize(x))
     if isa(x, Const)
         if !isa(x, Type)
@@ -329,16 +328,11 @@ function sizeof_tfunc(@nospecialize(x),)
     return Int
 end
 add_tfunc(Core.sizeof, 1, 1, sizeof_tfunc, 0)
-old_nfields(@nospecialize x) = length((isa(x, DataType) ? x : typeof(x)).types)
 add_tfunc(nfields, 1, 1,
     function (@nospecialize(x),)
-        isa(x, Const) && return Const(old_nfields(x.val))
-        isa(x, Conditional) && return Const(old_nfields(Bool))
-        if isType(x)
-            # TODO: remove with deprecation in builtins.c for nfields(::Type)
-            p = x.parameters[1]
-            issingletontype(p) && return Const(old_nfields(p))
-        elseif isa(x, DataType) && !x.abstract && !(x.name === Tuple.name && isvatuple(x)) && x !== DataType
+        isa(x, Const) && return Const(nfields(x.val))
+        isa(x, Conditional) && return Const(0)
+        if isa(x, DataType) && !x.abstract && !(x.name === Tuple.name && isvatuple(x))
             if !(x.name === _NAMEDTUPLE_NAME && !isconcretetype(x))
                 return Const(length(x.types))
             end
@@ -466,7 +460,7 @@ add_tfunc(<:, 2, 2,
               return Bool
           end, 0)
 
-function const_datatype_getfield_tfunc(@nospecialize(sv), @nospecialize(fld))
+function const_datatype_getfield_tfunc(@nospecialize(sv), fld::Int)
     if (fld == DATATYPE_NAME_FIELDINDEX ||
             fld == DATATYPE_PARAMETERS_FIELDINDEX ||
             fld == DATATYPE_TYPES_FIELDINDEX ||
@@ -604,9 +598,14 @@ function getfield_tfunc(@nospecialize(s00), @nospecialize(name))
                     return Const(sv.body)
                 end
             elseif isa(sv, DataType)
-                t = const_datatype_getfield_tfunc(sv, isa(nv, Symbol) ?
-                      fieldindex(DataType, nv, false) : nv)
-                t !== nothing && return t
+                idx = nv
+                if isa(idx, Symbol)
+                    idx = fieldindex(DataType, idx, false)
+                end
+                if isa(idx, Int)
+                    t = const_datatype_getfield_tfunc(sv, idx)
+                    t === nothing || return t
+                end
             elseif isa(sv, Core.TypeName)
                 fld = isa(nv, Symbol) ? fieldindex(Core.TypeName, nv, false) : nv
                 if (fld == TYPENAME_NAME_FIELDINDEX ||
@@ -657,7 +656,12 @@ function getfield_tfunc(@nospecialize(s00), @nospecialize(name))
             return rewrap_unionall(unwrapva(s.types[1]), s00)
         end
         # union together types of all fields
-        return tmerge_all(map(@nospecialize(t) -> rewrap_unionall(unwrapva(t), s00), s.types))
+        t = Bottom
+        for _ft in s.types
+            t = tmerge(t, rewrap_unionall(unwrapva(_ft), s00))
+            t === Any && break
+        end
+        return t
     end
     fld = name.val
     if isa(fld,Symbol)
@@ -767,7 +771,12 @@ function fieldtype_tfunc(@nospecialize(s0), @nospecialize(name))
         if !(Int <: name || Symbol <: name)
             return Bottom
         end
-        return tmerge_all(Any[ fieldtype_tfunc(s0, Const(i)) for i = 1:length(ftypes) ])
+        t = Bottom
+        for i in 1:length(ftypes)
+            t = tmerge(t, fieldtype_tfunc(s0, Const(i)))
+            t === Any && break
+        end
+        return t
     end
 
     fld = name.val
@@ -980,13 +989,29 @@ function tuple_tfunc(@nospecialize(argtype))
     return argtype
 end
 
+function array_type_undefable(@nospecialize(a))
+    if isa(a, Union)
+        return array_type_undefable(a.a) || array_type_undefable(a.b)
+    elseif isa(a, UnionAll)
+        return true
+    else
+        etype = (a::DataType).parameters[1]
+        return !(isbitstype(etype) || isbitsunion(etype))
+    end
+end
+
 function array_builtin_common_nothrow(argtypes::Array{Any,1}, first_idx_idx::Int)
     length(argtypes) >= 4 || return false
-    (argtypes[1] ⊑ Bool && argtypes[2] ⊑ Array) || return false
+    atype = argtypes[2]
+    (argtypes[1] ⊑ Bool && atype ⊑ Array) || return false
     for i = first_idx_idx:length(argtypes)
         argtypes[i] ⊑ Int || return false
     end
-    # If we have @inbounds (first argument is false), we're allowed to assume we don't throw
+    # If we could potentially throw undef ref errors, bail out now.
+    atype = widenconst(atype)
+    array_type_undefable(atype) && return false
+    # If we have @inbounds (first argument is false), we're allowed to assume
+    # we don't throw bounds errors.
     (isa(argtypes[1], Const) && !argtypes[1].val) && return true
     # Else we can't really say anything here
     # TODO: In the future we may be able to track the shapes of arrays though
@@ -1037,7 +1062,7 @@ function _builtin_nothrow(@nospecialize(f), argtypes::Array{Any,1}, @nospecializ
     return false
 end
 
-function builtin_nothrow(@nospecialize(f), argtypes::Array{Any, 1}, rt)
+function builtin_nothrow(@nospecialize(f), argtypes::Array{Any, 1}, @nospecialize(rt))
     rt === Bottom && return false
     contains_is(_PURE_BUILTINS, f) && return true
     return _builtin_nothrow(f, argtypes, rt)

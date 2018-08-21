@@ -8,7 +8,7 @@ using LinearAlgebra: BlasReal, BlasFloat
 include("testutils.jl") # test_approx_eq_modphase
 
 n = 10 #Size of test matrix
-srand(1)
+Random.seed!(1)
 
 @testset for relty in (Int, Float32, Float64, BigFloat), elty in (relty, Complex{relty})
     if relty <: AbstractFloat
@@ -44,9 +44,8 @@ srand(1)
         end
         @test eltype(Bidiagonal{elty}([1,2,3,4], [1.0f0,2.0f0,3.0f0], :U)) == elty
         @test isa(Bidiagonal{elty,Vector{elty}}(GenericArray(dv), ev, :U), Bidiagonal{elty,Vector{elty}})
-        # enable when deprecations for 0.7 are dropped
-        # @test_throws MethodError Bidiagonal(dv, GenericArray(ev), :U)
-        # @test_throws MethodError Bidiagonal(GenericArray(dv), ev, :U)
+        @test_throws MethodError Bidiagonal(dv, GenericArray(ev), :U)
+        @test_throws MethodError Bidiagonal(GenericArray(dv), ev, :U)
         BI = Bidiagonal([1,2,3,4], [1,2,3], :U)
         @test Bidiagonal(BI) === BI
         @test isa(Bidiagonal{elty}(BI), Bidiagonal{elty})

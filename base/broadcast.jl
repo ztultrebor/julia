@@ -602,12 +602,12 @@ Base.RefValue{String}("hello")
 ```
 """
 broadcastable(x::Union{Symbol,AbstractString,Function,UndefInitializer,Nothing,RoundingMode,Missing,Val}) = Ref(x)
-broadcastable(x::Ptr) = Ref{Ptr}(x) # Cannot use Ref(::Ptr) until ambiguous deprecation goes through
+broadcastable(x::Ptr) = Ref(x)
 broadcastable(::Type{T}) where {T} = Ref{Type{T}}(T)
 broadcastable(x::Union{AbstractArray,Number,Ref,Tuple,Broadcasted}) = x
-# In the future, default to collecting arguments. TODO: uncomment once deprecations are removed
-# broadcastable(x) = collect(x)
-# broadcastable(::Union{AbstractDict, NamedTuple}) = error("intentionally unimplemented to allow development in 1.x")
+# Default to collecting iterables — which will error for non-iterables
+broadcastable(x) = collect(x)
+broadcastable(::Union{AbstractDict, NamedTuple}) = throw(ArgumentError("broadcasting over dictionaries and `NamedTuple`s is reserved"))
 
 ## Computation of inferred result type, for empty and concretely inferred cases only
 _broadcast_getindex_eltype(bc::Broadcasted) = Base._return_type(bc.f, eltypes(bc.args))
@@ -713,6 +713,30 @@ Like [`broadcast`](@ref), but store the result of
 Note that `dest` is only used to store the result, and does not supply
 arguments to `f` unless it is also listed in the `As`,
 as in `broadcast!(f, A, A, B)` to perform `A[:] = broadcast(f, A, B)`.
+
+# Examples
+```jldoctest
+julia> A = [1.0; 0.0]; B = [0.0; 0.0];
+
+julia> broadcast!(+, B, A, (0, -2.0));
+
+julia> B
+2-element Array{Float64,1}:
+  1.0
+ -2.0
+
+julia> A
+2-element Array{Float64,1}:
+ 1.0
+ 0.0
+
+julia> broadcast!(+, A, A, (0, -2.0));
+
+julia> A
+2-element Array{Float64,1}:
+  1.0
+ -2.0
+```
 """
 broadcast!(f::Tf, dest, As::Vararg{Any,N}) where {Tf,N} = (materialize!(dest, broadcasted(f, As...)); dest)
 
@@ -1079,9 +1103,10 @@ function __dot__(x::Expr)
         Expr(x.head, x.args[1], dotargs[2])
     else
         if x.head == :&& || x.head == :||
-            Base.depwarn("""
-                using $(x.head) expressions in @. is deprecated; in the future it will
-                become elementwise. Break the expression into smaller parts instead.""", nothing)
+            error("""
+                Using `&&` and `||` is disallowed in `@.` expressions.
+                Use `&` or `|` for elementwise logical operations.
+                """)
         end
         head = string(x.head)
         if last(head) == '=' && first(head) != '.'

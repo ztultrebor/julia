@@ -330,7 +330,12 @@ static void expr_attributes(jl_value_t *v, int *has_intrinsics, int *has_defs)
     if (head == toplevel_sym || head == thunk_sym) {
         return;
     }
-    else if (head == global_sym || head == const_sym || head == copyast_sym) {
+    else if (head == global_sym) {
+        // this could be considered has_defs, but loops that assign to globals
+        // might still need to be optimized.
+        return;
+    }
+    else if (head == const_sym || head == copyast_sym) {
         // Note: `copyast` is included here since it indicates the presence of
         // `quote` and probably `eval`.
         *has_defs = 1;
@@ -417,21 +422,25 @@ static jl_module_t *call_require(jl_module_t *mod, jl_sym_t *var)
 {
     static jl_value_t *require_func = NULL;
     static size_t require_world = 0;
+    int build_mode = jl_generating_output();
     jl_module_t *m = NULL;
     jl_ptls_t ptls = jl_get_ptls_states();
     if (require_func == NULL && jl_base_module != NULL) {
         require_func = jl_get_global(jl_base_module, jl_symbol("require"));
-        require_world = ptls->world_age;
+        if (build_mode)
+            require_world = ptls->world_age;
     }
     if (require_func != NULL) {
         size_t last_age = ptls->world_age;
-        ptls->world_age = require_world;
+        if (build_mode)
+            ptls->world_age = require_world;
         jl_value_t *reqargs[3];
         reqargs[0] = require_func;
         reqargs[1] = (jl_value_t*)mod;
         reqargs[2] = (jl_value_t*)var;
         m = (jl_module_t*)jl_apply(reqargs, 3);
-        ptls->world_age = last_age;
+        if (build_mode)
+            ptls->world_age = last_age;
     }
     if (m == NULL || !jl_is_module(m)) {
         jl_errorf("failed to load module %s", jl_symbol_name(var));
@@ -504,7 +513,6 @@ int jl_is_toplevel_only_expr(jl_value_t *e)
 {
     return jl_is_expr(e) &&
         (((jl_expr_t*)e)->head == module_sym ||
-         ((jl_expr_t*)e)->head == importall_sym ||
          ((jl_expr_t*)e)->head == import_sym ||
          ((jl_expr_t*)e)->head == using_sym ||
          ((jl_expr_t*)e)->head == export_sym ||
@@ -533,7 +541,7 @@ static void import_module(jl_module_t *m, jl_module_t *import)
     jl_binding_t *b;
     if (jl_binding_resolved_p(m, name)) {
         b = jl_get_binding(m, name);
-        if (b->owner != m || (b->value && b->value != (jl_value_t*)import)) {
+        if ((!b->constp && b->owner != m) || (b->value && b->value != (jl_value_t*)import)) {
             jl_errorf("importing %s into %s conflicts with an existing identifier",
                       jl_symbol_name(name), jl_symbol_name(m->name));
         }
@@ -547,16 +555,6 @@ static void import_module(jl_module_t *m, jl_module_t *import)
         b->constp = 1;
         jl_gc_wb(m, (jl_value_t*)import);
     }
-}
-
-// replace Base.X with top-level X
-static jl_module_t *deprecation_replacement_module(jl_module_t *parent, jl_sym_t *name)
-{
-    if (parent == jl_base_module) {
-        if (name == jl_symbol("Test") || name == jl_symbol("Mmap"))
-            return call_require(jl_base_module, name);
-    }
-    return NULL;
 }
 
 // in `import A.B: x, y, ...`, evaluate the `A.B` part if it exists
@@ -592,6 +590,12 @@ jl_value_t *jl_toplevel_eval_flex(jl_module_t *m, jl_value_t *e, int fast, int e
             jl_lineno = jl_linenode_line(e);
             return jl_nothing;
         }
+        if (jl_is_symbol(e)) {
+            char *n = jl_symbol_name((jl_sym_t*)e);
+            while (*n == '_') ++n;
+            if (*n == 0)
+                jl_error("all-underscore identifier used as rvalue");
+        }
         return jl_interpret_toplevel_expr_in(m, e, NULL, NULL);
     }
 
@@ -610,31 +614,6 @@ jl_value_t *jl_toplevel_eval_flex(jl_module_t *m, jl_value_t *e, int fast, int e
     }
     else if (ex->head == module_sym) {
         return jl_eval_module_expr(m, ex);
-    }
-    else if (ex->head == importall_sym) {
-        jl_sym_t *name = NULL;
-        jl_depwarn("`importall` is deprecated, use `using` or individual `import` statements instead",
-                   (jl_value_t*)jl_symbol("importall"));
-        jl_module_t *from = eval_import_from(m, ex, "importall");
-        size_t i = 0;
-        if (from) {
-            i = 1;
-            ex = (jl_expr_t*)jl_exprarg(ex, 0);
-        }
-        for (; i < jl_expr_nargs(ex); i++) {
-            jl_value_t *a = jl_exprarg(ex, i);
-            if (jl_is_expr(a) && ((jl_expr_t*)a)->head == dot_sym) {
-                name = NULL;
-                jl_module_t *import = eval_import_path(m, from, ((jl_expr_t*)a)->args, &name, "importall");
-                if (name != NULL) {
-                    import = (jl_module_t*)jl_eval_global_var(import, name);
-                    if (!jl_is_module(import))
-                        jl_errorf("invalid %s statement: name exists but does not refer to a module", jl_symbol_name(ex->head));
-                }
-                jl_module_importall(m, import);
-            }
-        }
-        return jl_nothing;
     }
     else if (ex->head == using_sym) {
         size_t last_age = ptls->world_age;
@@ -655,30 +634,20 @@ jl_value_t *jl_toplevel_eval_flex(jl_module_t *m, jl_value_t *e, int fast, int e
                 jl_module_t *u = import;
                 if (name != NULL)
                     u = (jl_module_t*)jl_eval_global_var(import, name);
-                if (jl_is_module(u)) {
-                    if (from) {
-                        jl_depwarn("`using A: B` will only be allowed for single bindings, not modules. Use "
-                                   "`using A.B` instead",
-                                   (jl_value_t*)jl_symbol("using"));
-                    }
+                if (from) {
+                    // `using A: B` syntax
+                    jl_module_use(m, import, name);
+                }
+                else {
+                    if (!jl_is_module(u))
+                        jl_errorf("invalid using path: \"%s\" does not name a module", jl_symbol_name(name));
+                    // `using A.B` syntax
                     jl_module_using(m, u);
                     if (m == jl_main_module && name == NULL) {
                         // TODO: for now, `using A` in Main also creates an explicit binding for `A`
                         // This will possibly be extended to all modules.
                         import_module(m, u);
                     }
-                }
-                else {
-                    if (!from) {
-                        jl_depwarn("`using A.B` will only be allowed for modules, not single bindings. Use "
-                                   "`using A: B` instead",
-                                   (jl_value_t*)jl_symbol("using"));
-                    }
-                    jl_module_t *replacement = deprecation_replacement_module(import, name);
-                    if (replacement)
-                        jl_module_using(m, replacement);
-                    else
-                        jl_module_use(m, import, name);
                 }
             }
         }
@@ -705,11 +674,7 @@ jl_value_t *jl_toplevel_eval_flex(jl_module_t *m, jl_value_t *e, int fast, int e
                     import_module(m, import);
                 }
                 else {
-                    jl_module_t *replacement = deprecation_replacement_module(import, name);
-                    if (replacement)
-                        import_module(m, replacement);
-                    else
-                        jl_module_import(m, import, name);
+                    jl_module_import(m, import, name);
                 }
             }
         }

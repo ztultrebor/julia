@@ -431,9 +431,13 @@ static std::pair<Value*,int> FindBaseValue(const State &S, Value *V, bool UseCac
                 break;
             CurrentV = NewV;
         }
-        else if (isa<GetElementPtrInst>(CurrentV))
+        else if (isa<GetElementPtrInst>(CurrentV)) {
             CurrentV = cast<GetElementPtrInst>(CurrentV)->getOperand(0);
-        else if (isa<ExtractValueInst>(CurrentV)) {
+            // GEP can make vectors from a single base pointer
+            if (fld_idx != -1 && !isSpecialPtrVec(CurrentV->getType())) {
+                fld_idx = -1;
+            }
+        } else if (isa<ExtractValueInst>(CurrentV)) {
             Value *Operand = cast<ExtractValueInst>(CurrentV)->getOperand(0);
             if (!isUnionRep(Operand->getType()))
                 break;
@@ -461,6 +465,23 @@ static std::pair<Value*,int> FindBaseValue(const State &S, Value *V, bool UseCac
             fld_idx = IdxOp->getLimitedValue(INT_MAX);
             CurrentV = EEI->getVectorOperand();
         }
+        else if (auto LI = dyn_cast<LoadInst>(CurrentV)) {
+            if (auto PtrT = dyn_cast<PointerType>(LI->getType())) {
+                if (PtrT->getAddressSpace() == AddressSpace::Loaded) {
+                    CurrentV = LI->getPointerOperand();
+                    if (!isSpecialPtr(CurrentV->getType())) {
+                        // Special case to bypass the check below.
+                        // This could really be anything, but it's not loaded
+                        // from a tracked pointer, so it doesn't matter what
+                        // it is.
+                        return std::make_pair(CurrentV, fld_idx);
+                    }
+                    continue;
+                }
+            }
+            // In general a load terminates a walk
+            break;
+        }
         else {
             break;
         }
@@ -469,7 +490,9 @@ static std::pair<Value*,int> FindBaseValue(const State &S, Value *V, bool UseCac
            isa<Argument>(CurrentV) || isa<SelectInst>(CurrentV) ||
            isa<PHINode>(CurrentV) || isa<AddrSpaceCastInst>(CurrentV) ||
            isa<Constant>(CurrentV) || isa<AllocaInst>(CurrentV) ||
-           isa<ExtractValueInst>(CurrentV));
+           isa<ExtractValueInst>(CurrentV) ||
+           isa<InsertElementInst>(CurrentV) ||
+           isa<ShuffleVectorInst>(CurrentV));
     return std::make_pair(CurrentV, fld_idx);
 }
 
@@ -538,6 +561,10 @@ int LateLowerGCFrame::NumberBase(State &S, Value *V, Value *CurrentV)
                 getValueAddrSpace(CurrentV) != AddressSpace::Tracked)) {
         // We know this is rooted in the parent
         Number = -1;
+    } else if (!isSpecialPtr(CurrentV->getType()) && !isUnion) {
+        // Externally rooted somehow hopefully (otherwise there's a bug in the
+        // input IR)
+        Number = -1;
     } else if (isa<SelectInst>(CurrentV) && !isUnion && getValueAddrSpace(CurrentV) != AddressSpace::Tracked) {
         int Number = LiftSelect(S, cast<SelectInst>(CurrentV));
         S.AllPtrNumbering[V] = Number;
@@ -581,22 +608,37 @@ std::vector<int> LateLowerGCFrame::NumberVectorBase(State &S, Value *CurrentV) {
         ((isa<Argument>(CurrentV) || isa<AllocaInst>(CurrentV) ||
          isa<AddrSpaceCastInst>(CurrentV)) &&
          getValueAddrSpace(CurrentV) != AddressSpace::Tracked)) {
+        Numbers.resize(cast<VectorType>(CurrentV->getType())->getNumElements(), -1);
     }
     /* We (the frontend) don't insert either of these, but it would be legal -
        though a bit strange, considering they're pointers - for the optimizer to
        do so. All that's needed here is to NumberVector the previous vector/value
        and lift the operation */
-    else if (isa<ShuffleVectorInst>(CurrentV)) {
-        assert(false && "TODO Shuffle");
-    } else if (isa<InsertElementInst>(CurrentV)) {
-        assert(false && "TODO Insert");
-    } else if (isa<LoadInst>(CurrentV)) {
+    else if (auto *SVI = dyn_cast<ShuffleVectorInst>(CurrentV)) {
+        std::vector<int> Numbers1 = NumberVectorBase(S, SVI->getOperand(0));
+        std::vector<int> Numbers2 = NumberVectorBase(S, SVI->getOperand(1));
+        auto Mask = SVI->getShuffleMask();
+        for (unsigned idx : Mask) {
+            if (idx < Numbers1.size()) {
+                Numbers.push_back(Numbers1[idx]);
+            } else {
+                Numbers.push_back(Numbers2[idx - Numbers1.size()]);
+            }
+        }
+    } else if (auto *IEI = dyn_cast<InsertElementInst>(CurrentV)) {
+        unsigned idx = cast<ConstantInt>(IEI->getOperand(2))->getZExtValue();
+        Numbers = NumberVectorBase(S, IEI->getOperand(0));
+        int ElNumber = Number(S, IEI->getOperand(1));
+        Numbers[idx] = ElNumber;
+    } else if (isa<LoadInst>(CurrentV) || isa<CallInst>(CurrentV) || isa<PHINode>(CurrentV)) {
         // This is simple, we can just number them sequentially
         for (unsigned i = 0; i < cast<VectorType>(CurrentV->getType())->getNumElements(); ++i) {
             int Num = ++S.MaxPtrNumber;
             Numbers.push_back(Num);
             S.ReversePtrNumbering[Num] = CurrentV;
         }
+    } else {
+        assert(false && "Unexpected vector generating operating");
     }
     S.AllVectorNumbering[CurrentV] = Numbers;
     return Numbers;
@@ -608,9 +650,17 @@ std::vector<int> LateLowerGCFrame::NumberVector(State &S, Value *V) {
         return it->second;
     auto CurrentV = FindBaseValue(S, V);
     assert(CurrentV.second == -1);
-    auto Numbers = NumberVectorBase(S, CurrentV.first);
-    S.AllVectorNumbering[V] = Numbers;
-    return Numbers;
+    // E.g. if this is a gep, it's possible for the base to be a single ptr
+    if (isSpecialPtrVec(CurrentV.first->getType())) {
+        auto Numbers = NumberVectorBase(S, CurrentV.first);
+        S.AllVectorNumbering[V] = Numbers;
+        return Numbers;
+    } else {
+        std::vector<int> Numbers{};
+        Numbers.resize(cast<VectorType>(V->getType())->getNumElements(),
+            NumberBase(S, V, CurrentV.first));
+        return Numbers;
+    }
 }
 
 static void MaybeResize(BBState &BBS, unsigned Idx) {
@@ -693,6 +743,8 @@ void LateLowerGCFrame::NoteUse(State &S, BBState &BBS, Value *V, BitVector &Uses
         std::vector<int> Nums = NumberVector(S, V);
         for (int Num : Nums) {
             MaybeResize(BBS, Num);
+            if (Num < 0)
+                continue;
             Uses[Num] = 1;
         }
     }
@@ -708,7 +760,7 @@ void LateLowerGCFrame::NoteUse(State &S, BBState &BBS, Value *V, BitVector &Uses
 void LateLowerGCFrame::NoteOperandUses(State &S, BBState &BBS, User &UI, BitVector &Uses) {
     for (Use &U : UI.operands()) {
         Value *V = U;
-        if (!isSpecialPtr(V->getType()))
+        if (!isSpecialPtr(V->getType()) && !isSpecialPtrVec(V->getType()))
             continue;
         NoteUse(S, BBS, V, Uses);
     }
@@ -1089,7 +1141,10 @@ State LateLowerGCFrame::LocalScan(Function &F) {
                     // we know that the object is a constant as well and doesn't need rooting.
                     RefinedPtr.push_back(-2);
                 }
-                MaybeNoteDef(S, BBS, LI, BBS.Safepoints, std::move(RefinedPtr));
+                if (!LI->getType()->isPointerTy() ||
+                    cast<PointerType>(LI->getType())->getAddressSpace() != AddressSpace::Loaded) {
+                    MaybeNoteDef(S, BBS, LI, BBS.Safepoints, std::move(RefinedPtr));
+                }
                 NoteOperandUses(S, BBS, I, BBS.UpExposedUsesUnrooted);
             } else if (SelectInst *SI = dyn_cast<SelectInst>(&I)) {
                 // We need to insert an extra select for the GC root

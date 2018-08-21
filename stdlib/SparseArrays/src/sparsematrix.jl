@@ -356,6 +356,7 @@ similar(S::SparseMatrixCSC, ::Type{TvNew}, ::Type{TiNew}, m::Integer, n::Integer
 
 
 # converting between SparseMatrixCSC types
+SparseMatrixCSC(S::SparseMatrixCSC) = copy(S)
 AbstractMatrix{Tv}(A::SparseMatrixCSC) where {Tv} = SparseMatrixCSC{Tv}(A)
 SparseMatrixCSC{Tv}(S::SparseMatrixCSC{Tv}) where {Tv} = copy(S)
 SparseMatrixCSC{Tv}(S::SparseMatrixCSC) where {Tv} = SparseMatrixCSC{Tv,eltype(S.colptr)}(S)
@@ -867,8 +868,13 @@ function ftranspose(A::SparseMatrixCSC{Tv,Ti}, f::Function) where {Tv,Ti}
 end
 adjoint(A::SparseMatrixCSC) = Adjoint(A)
 transpose(A::SparseMatrixCSC) = Transpose(A)
-Base.copy(A::Adjoint{<:Any,<:SparseMatrixCSC}) = ftranspose(A.parent, conj)
-Base.copy(A::Transpose{<:Any,<:SparseMatrixCSC}) = ftranspose(A.parent, identity)
+Base.copy(A::Adjoint{<:Any,<:SparseMatrixCSC}) = ftranspose(A.parent, x -> copy(adjoint(x)))
+Base.copy(A::Transpose{<:Any,<:SparseMatrixCSC}) = ftranspose(A.parent, x -> copy(transpose(x)))
+function Base.permutedims(A::SparseMatrixCSC, (a,b))
+    (a, b) == (2, 1) && return ftranspose(A, identity)
+    (a, b) == (1, 2) && return copy(A)
+    throw(ArgumentError("no valid permutation of dimensions"))
+end
 
 """
     unchecked_noalias_permute!(X::SparseMatrixCSC{Tv,Ti},
@@ -1246,20 +1252,10 @@ function fkeep!(A::SparseMatrixCSC, f, trim::Bool = true)
     A
 end
 
-function tril!(A::SparseMatrixCSC, k::Integer = 0, trim::Bool = true)
-    if !(-A.m - 1 <= k <= A.n - 1)
-        throw(ArgumentError(string("the requested diagonal, $k, must be at least ",
-            "$(-A.m - 1) and at most $(A.n - 1) in an $(A.m)-by-$(A.n) matrix")))
-    end
+tril!(A::SparseMatrixCSC, k::Integer = 0, trim::Bool = true) =
     fkeep!(A, (i, j, x) -> i + k >= j, trim)
-end
-function triu!(A::SparseMatrixCSC, k::Integer = 0, trim::Bool = true)
-    if !(-A.m + 1 <= k <= A.n + 1)
-        throw(ArgumentError(string("the requested diagonal, $k, must be at least ",
-            "$(-A.m + 1) and at most $(A.n + 1) in an $(A.m)-by-$(A.n) matrix")))
-    end
+triu!(A::SparseMatrixCSC, k::Integer = 0, trim::Bool = true) =
     fkeep!(A, (i, j, x) -> j >= i + k, trim)
-end
 
 droptol!(A::SparseMatrixCSC, tol; trim::Bool = true) =
     fkeep!(A, (i, j, x) -> abs(x) > tol, trim)
@@ -1301,10 +1297,7 @@ dropzeros(A::SparseMatrixCSC; trim::Bool = true) = dropzeros!(copy(A), trim = tr
 ## Find methods
 
 function findall(S::SparseMatrixCSC)
-    if !(eltype(S) <: Bool)
-        Base.depwarn("In the future `findall(A)` will only work on boolean collections. Use `findall(x->x!=0, A)` instead.", :findall)
-    end
-    return findall(x->x!=0, S)
+    return findall(identity, S)
 end
 
 function findall(p::Function, S::SparseMatrixCSC)
@@ -1427,7 +1420,7 @@ distribution is used in case `rfn` is not specified. The optional `rng`
 argument specifies a random number generator, see [Random Numbers](@ref).
 
 # Examples
-```jldoctest; setup = :(using Random; srand(1234))
+```jldoctest; setup = :(using Random; Random.seed!(1234))
 julia> sprand(Bool, 2, 2, 0.5)
 2×2 SparseMatrixCSC{Bool,Int64} with 2 stored entries:
   [1, 1]  =  true
@@ -1476,7 +1469,7 @@ where nonzero values are sampled from the normal distribution. The optional `rng
 argument specifies a random number generator, see [Random Numbers](@ref).
 
 # Examples
-```jldoctest; setup = :(using Random; srand(0))
+```jldoctest; setup = :(using Random; Random.seed!(0))
 julia> sprandn(2, 2, 0.75)
 2×2 SparseMatrixCSC{Float64,Int64} with 2 stored entries:
   [1, 1]  =  0.586617
@@ -1613,9 +1606,10 @@ end
 
 # In general, output of sparse matrix reductions will not be sparse,
 # and computing reductions along columns into SparseMatrixCSC is
-# non-trivial, so use Arrays for output
-Base.reducedim_initarray(A::SparseMatrixCSC, region, v0, ::Type{R}) where {R} =
-    fill(v0, Base.reduced_indices(A,region))
+# non-trivial, so use Arrays for output. Array element type is given by `R`.
+function Base.reducedim_initarray(A::SparseMatrixCSC, region, v0, ::Type{R}) where {R}
+    fill!(Array{R}(undef, Base.to_shape(Base.reduced_indices(A, region))), v0)
+end
 
 # General mapreduce
 function _mapreducezeros(f, op, ::Type{T}, nzeros::Int, v0) where T
@@ -3351,10 +3345,6 @@ end
 function diag(A::SparseMatrixCSC{Tv,Ti}, d::Integer=0) where {Tv,Ti}
     m, n = size(A)
     k = Int(d)
-    if !(-m <= k <= n)
-        throw(ArgumentError(string("requested diagonal, $k, must be at least $(-m) ",
-            "and at most $n in an $m-by-$n matrix")))
-    end
     l = k < 0 ? min(m+k,n) : min(n-k,m)
     r, c = k <= 0 ? (-k, 0) : (0, k) # start row/col -1
     ind = Vector{Ti}()
@@ -3469,51 +3459,6 @@ function rotl90(A::SparseMatrixCSC)
         J[i] = n - J[i] + 1
     end
     return sparse(J, I, V, n, m)
-end
-
-## hashing
-
-# End the run and return the current hash
-@inline function hashrun(val, runlength::Int, h::UInt)
-    if runlength == 0
-        return h
-    elseif runlength > 1
-        h += Base.hashrle_seed
-        h = hash(runlength, h)
-    end
-    hash(val, h)
-end
-
-function hash(A::SparseMatrixCSC{T}, h::UInt) where T
-    h += Base.hashaa_seed
-    sz = size(A)
-    h += hash(sz)
-
-    colptr = A.colptr
-    rowval = A.rowval
-    nzval = A.nzval
-    lastidx = 0
-    runlength = 0
-    lastnz = zero(T)
-    @inbounds for col = 1:size(A, 2)
-        for j = colptr[col]:colptr[col+1]-1
-            nz = nzval[j]
-            isequal(nz, zero(T)) && continue
-            idx = Base._sub2ind(sz, rowval[j], col)
-            if idx != lastidx+1 || !isequal(nz, lastnz)  # Run is over
-                h = hashrun(lastnz, runlength, h)        # Hash previous run
-                h = hashrun(0, idx-lastidx-1, h)         # Hash intervening zeros
-
-                runlength = 1
-                lastnz = nz
-            else
-                runlength += 1
-            end
-            lastidx = idx
-        end
-    end
-    h = hashrun(lastnz, runlength, h) # Hash previous run
-    hashrun(0, length(A)-lastidx, h)  # Hash zeros at end
 end
 
 ## Uniform matrix arithmetic

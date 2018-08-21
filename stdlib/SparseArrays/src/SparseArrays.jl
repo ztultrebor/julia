@@ -1,7 +1,5 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
-__precompile__(true)
-
 """
 Support for sparse arrays. Provides `AbstractSparseArray` and subtypes.
 """
@@ -13,16 +11,16 @@ using Base.Sort: Forward
 using LinearAlgebra
 
 import Base: +, -, *, \, /, &, |, xor, ==
-import LinearAlgebra: mul!, ldiv!, rdiv!, chol, adjoint!, diag, eigen, dot,
+import LinearAlgebra: mul!, ldiv!, rdiv!, cholesky, adjoint!, diag, eigen, dot,
     issymmetric, istril, istriu, lu, tr, transpose!, tril!, triu!,
     cond, diagm, factorize, ishermitian, norm, opnorm, lmul!, rmul!, tril, triu
 
 import Base: @get!, acos, acosd, acot, acotd, acsch, asech, asin, asind, asinh,
     atan, atand, atanh, broadcast!, conj!, cos, cosc, cosd, cosh, cospi, cot,
-    cotd, coth, count, csc, cscd, csch, done,
+    cotd, coth, count, csc, cscd, csch,
     exp10, exp2, findprev, findnext, floor, hash, argmin, inv,
-    log10, log2, next, sec, secd, sech, show,
-    sin, sinc, sind, sinh, sinpi, squeeze, start, sum, summary, tan,
+    log10, log2, sec, secd, sech, show,
+    sin, sinc, sind, sinh, sinpi, dropdims, sum, summary, tan,
     tand, tanh, trunc, abs, abs2,
     broadcast, ceil, complex, conj, convert, copy, copyto!, adjoint,
     exp, expm1, findall, findmax, findmin, float, getindex,
