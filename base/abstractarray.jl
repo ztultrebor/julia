@@ -1135,11 +1135,16 @@ their component parts.  A typical definition for an array that wraps a parent is
 """
 function dataids(A::AbstractArray)
     @_inline_meta
-    ids = _splatmap(dataids, ntuple(i -> getfield(A, i), Val(nfields(A))))
-    if !isimmutable(A)
-        ids = (UInt(pointer_from_objref(A)), ids...)
+    if @generated
+        :(ids = tuple($([:(dataids(getfield(A, $i))...) for i in 1:fieldcount(A)]...)))
+    else
+        ids = _splatmap(dataids, ntuple(i -> getfield(A, i), Val(nfields(A))))
     end
-    return ids
+    if isimmutable(A) || !isempty(ids)
+        return ids
+    else
+        return (UInt(pointer_from_objref(A)),)
+    end
 end
 dataids(A::Array) = (UInt(pointer(A)),)
 dataids(::AbstractRange) = ()
