@@ -21,7 +21,7 @@ nested_error_pattern = r"""
     err_str = try
         eval(nested_error_expr)
     catch
-        excs = Base.catch_stack()
+        excs = Base.current_exceptions()
         @test typeof.(first.(excs)) == [UndefVarError, DivideError]
         sprint(Base.display_error, excs)
     end

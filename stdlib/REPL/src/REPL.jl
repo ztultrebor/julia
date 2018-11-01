@@ -16,8 +16,7 @@ import Base:
     display,
     show,
     AnyDict,
-    ==,
-    catch_stack
+    ==
 
 
 include("Terminals.jl")
@@ -95,7 +94,7 @@ function eval_user_input(@nospecialize(ast), backend::REPLBackend)
                 println("SYSTEM ERROR: Failed to report error to REPL frontend")
                 println(err)
             end
-            lasterr = catch_stack()
+            lasterr = current_exceptions()
         end
     end
     Base.sigatomic_end()
@@ -174,7 +173,7 @@ function print_response(errio::IO, @nospecialize(response), show_value::Bool, ha
                 println(errio) # an error during printing is likely to leave us mid-line
                 println(errio, "SYSTEM (REPL): showing an error caused an error")
                 try
-                    Base.invokelatest(Base.display_error, errio, catch_stack())
+                    Base.invokelatest(Base.display_error, errio, current_exceptions())
                 catch e
                     # at this point, only print the name of the type as a Symbol to
                     # minimize the possibility of further errors.
@@ -184,7 +183,7 @@ function print_response(errio::IO, @nospecialize(response), show_value::Bool, ha
                 end
                 break
             end
-            val = catch_stack()
+            val = current_exceptions()
             iserr = true
         end
     end
@@ -724,7 +723,7 @@ function respond(f, repl, main; pass_empty = false)
                 ast = Base.invokelatest(f, line)
                 response = eval_with_backend(ast, backend(repl))
             catch
-                response = (catch_stack(), true)
+                response = (current_exceptions(), true)
             end
             print_response(repl, response, !ends_with_semicolon(line), Base.have_color)
         end
@@ -873,7 +872,7 @@ function setup_interface(
             end
             hist_from_file(hp, f, hist_path)
         catch
-            print_response(repl, (catch_stack(),true), true, Base.have_color)
+            print_response(repl, (current_exceptions(),true), true, Base.have_color)
             println(outstream(repl))
             @info "Disabling history file for this session"
             repl.history_file = false

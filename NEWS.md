@@ -52,6 +52,9 @@ Standard library changes
 
 * Sets are now displayed less compactly in the REPL, as a column of elements, like vectors
   and dictionaries ([#33300]).
+* The experimental function `Base.catch_stack()` has been renamed to
+  `current_exceptions()` and is now exported from Base. It has also been given
+  a more precise return type.
 
 #### Libdl
 

@@ -296,7 +296,7 @@ JL_DLLEXPORT jl_value_t *jl_get_backtrace(void)
 // interleaved.
 JL_DLLEXPORT jl_value_t *jl_get_excstack(jl_task_t* task, int include_bt, int max_entries)
 {
-    JL_TYPECHK(catch_stack, task, (jl_value_t*)task);
+    JL_TYPECHK(current_exceptions, task, (jl_value_t*)task);
     jl_ptls_t ptls = jl_get_ptls_states();
     if (task != ptls->current_task &&
         task->state != failed_sym && task->state != done_sym) {

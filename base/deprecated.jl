@@ -191,4 +191,6 @@ MPFR.BigFloat(x::Real, prec::Int, rounding::RoundingMode) = BigFloat(x, rounding
     Base.@deprecate_binding Mutex ReentrantLock
 end
 
+@deprecate catch_stack(task=current_task(); include_bt=true) current_exceptions(task; backtrace=include_bt) false
+
 # END 1.3 deprecations

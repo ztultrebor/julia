@@ -692,7 +692,7 @@ function process_backtrace(t::Vector, limit::Int=typemax(Int); skipC = true)
     return ret
 end
 
-function show_exception_stack(io::IO, stack::Vector)
+function show_exception_stack(io::IO, stack)
     # Display exception stack with the top of the stack first.  This ordering
     # means that the user doesn't have to scroll up in the REPL to discover the
     # root cause.
@@ -716,4 +716,14 @@ function show(io::IO, ip::InterpreterIP)
         print(io, " in $(ip.code) at statement $(Int(ip.stmt))")
     end
 end
+
+size(s::ExceptionStack) = size(s.stack)
+getindex(s::ExceptionStack, i::Int) = s.stack[i]
+
+function show(io::IO, ::MIME"text/plain", stack::ExceptionStack)
+    nexc = length(stack)
+    printstyled(io, nexc, "-element ExceptionStack", nexc == 0 ? "" : ":\n")
+    show_exception_stack(io, stack)
+end
+show(io::IO, stack::ExceptionStack) = show(io, MIME("text/plain"), stack)
 
