@@ -446,6 +446,7 @@ end
 
 # given a project directory (implicit env from LOAD_PATH) and a name,
 # find an entry point for `name`, and see if it has an associated project file
+# TODO: aren't we supposed to first check for the Project file first and see if it declares a path?
 function entry_point_and_project_file(dir::String, name::String)::Union{Tuple{Nothing,Nothing},Tuple{String,Nothing},Tuple{String,String}}
     path = normpath(joinpath(dir, "$name.jl"))
     isfile_casesensitive(path) && return path, nothing
