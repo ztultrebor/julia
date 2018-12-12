@@ -129,12 +129,12 @@ without those definitions.
 `Base` is a module that contains basic functionality (the contents of `base/`). All modules implicitly contain `using Base`,
 since this is needed in the vast majority of cases.
 
-Other modules live in `stdlib/`, and may be loaded as needed by users as they would load
-their own custom modules or packages. For example, if you wanted to perform some eigenvalue
-calculations (the tooling for which is part of `stdlib`), you could use:
+Julia also provides some standard library modules in `stdlib/`, and may be loaded as needed by users as they would load
+their own custom modules or packages. For example, if you wanted to perform some unit testing
+(the tooling for which is part of `stdlib`), you could use:
 
-```
-using IterativeEigenSolvers
+```julia
+using Test
 ```
 
 ### Default top-level definitions and bare modules
