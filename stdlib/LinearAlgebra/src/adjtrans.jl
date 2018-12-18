@@ -155,6 +155,25 @@ vec(v::TransposeAbsVec) = parent(v)
 cmp(A::AdjOrTransAbsVec, B::AdjOrTransAbsVec) = cmp(parent(A), parent(B))
 isless(A::AdjOrTransAbsVec, B::AdjOrTransAbsVec) = isless(parent(A), parent(B))
 
+# provide strides, but only for eltypes that are directly stored in memory (i.e. unaffected
+# by recursive `adjoint` and `transpose`, being `Real` and `Number` respectively)
+function Base.strides(a::Union{Adjoint{<:Real, <:AbstractVector}, Transpose{<:Number, <:AbstractVector}})
+    str = strides(a.parent)
+    if str === nothing
+        return nothing
+    else
+        return (1, str[1])
+    end
+end
+function Base.strides(a::Union{Adjoint{<:Real, <:AbstractMatrix}, Transpose{<:Number, <:AbstractMatrix}})
+    str = strides(a.parent)
+    if str === nothing
+        return nothing
+    else
+        return (str[2], str[1])
+    end
+end
+
 ### concatenation
 # preserve Adjoint/Transpose wrapper around vectors
 # to retain the associated semantics post-concatenation
