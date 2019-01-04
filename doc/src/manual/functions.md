@@ -278,12 +278,34 @@ julia> x.a
 Named tuples are very similar to tuples, except that fields can additionally be accessed by name
 using dot syntax (`x.a`).
 
-## Multiple Return Values
+## Assignment destructuring and Multiple Return Values
 
-In Julia, one returns a tuple of values to simulate returning multiple values. However, tuples
-can be created and destructured without needing parentheses, thereby providing an illusion that
-multiple values are being returned, rather than a single tuple value. For example, the following
-function returns a pair of values:
+A comma-separated list of variables (optionally wrapped in parentheses) can appear on the left
+side of an assignment: the value on the right side is _destructured_ by iterating over and
+assigned to each variable in turn:
+
+```jldoctest
+julia> (a,b,c) = 1:3
+1:3
+
+julia> b
+2
+```
+
+The iterator needs to be at least as long as the number of variables, and any excess elements
+are ignored. Additionally a single underscore `_` (which is an otherwise invalid variable name)
+can be used on the left to avoid assigning specific elements:
+
+```jldoctest
+julia> _,_,_,d = 1:10
+1:10
+
+julia> d
+4
+```
+
+This can be used to simulate returning multiple values from functions by returning a tuple or
+other iterable value. For example, the following function returns a pair of values:
 
 ```jldoctest foofunc
 julia> function foo(a,b)
