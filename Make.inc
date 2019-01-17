@@ -13,6 +13,8 @@
 # Julia precompilation options
 # Set to zero to turn off extra precompile (e.g. for the REPL)
 JULIA_PRECOMPILE ?= 1
+# Set to 1 to try reuse precompile file from earlier build
+JULIA_REUSE_PRECOMPILE ?= 0
 
 # OPENBLAS build options
 OPENBLAS_TARGET_ARCH:=
