@@ -295,6 +295,20 @@ if isdefined(Main, :Base)
         end
         (a...,)
     end
+    # Constant-fold-able indexing into tuples to functionally expose Base.tail and Base.front
+    function getindex(@nospecialize(t::Tuple), r::UnitRange)
+        @_inline_meta
+        r.start > r.stop && return ()
+        if r.start == 1
+            r.stop == length(t)   && return t
+            r.stop == length(t)-1 && return front(t)
+            r.stop == length(t)-2 && return front(front(t))
+        elseif r.stop == length(t)
+            r.start == 2 && return tail(t)
+            r.start == 3 && return tail(tail(t))
+        end
+        return ((t[ri] for ri in r)...,)
+    end
 end
 
 """
