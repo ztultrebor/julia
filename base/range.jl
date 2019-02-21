@@ -296,7 +296,7 @@ if isdefined(Main, :Base)
             r.start == 2 && return tail(t)
             r.start == 3 && return tail(tail(t))
         end
-        return ((t[ri] for ri in r)...,)
+        return (eltype(t)[t[ri] for ri in r]...,)
     end
 end
 
