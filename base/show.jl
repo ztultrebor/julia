@@ -425,6 +425,18 @@ function show(io::IO, @nospecialize(x::Type))
         show_datatype(io, x)
         return
     elseif x isa Union
+        if x <: StridedArray && x.a <: DenseArray
+            T, N = x.a.parameters
+            if x === StridedArray{T,N}
+                print(io, "StridedArray")
+                show_delim_array(io, x.a.parameters, '{', ',', '}', false)
+                return
+            elseif x === StridedVecOrMat{T}
+                print(io, "StridedVecOrMat")
+                show_delim_array(io, (x.a.parameters[1],), '{', ',', '}', false)
+                return
+            end
+        end
         print(io, "Union")
         show_delim_array(io, uniontypes(x), '{', ',', '}', false)
         return

@@ -1465,3 +1465,12 @@ Z = Array{Float64}(undef,0,0)
 
 # issue #31065, do not print parentheses for nested dot expressions
 @test sprint(Base.show_unquoted, :(foo.x.x)) == "foo.x.x"
+
+# Simple printing of StridedArray
+@test startswith(sprint(show, StridedArray), "StridedArray")
+@test startswith(sprint(show, StridedVecOrMat), "StridedVecOrMat")
+@test startswith(sprint(show, StridedVector), "Strided")
+@test startswith(sprint(show, StridedMatrix), "Strided")
+@test occursin("StridedArray", sprint(show, SubArray{T, N, A} where {T,N,A<:StridedArray}))
+@test !occursin("Strided", sprint(show, Union{DenseArray, SubArray}))
+@test !occursin("Strided", sprint(show, Union{DenseArray, Base.ReinterpretArray, Base.ReshapedArray, SubArray}))
