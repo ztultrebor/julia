@@ -427,11 +427,11 @@ function show(io::IO, @nospecialize(x::Type))
     elseif x isa Union
         if x <: StridedArray && x.a <: DenseArray
             T, N = x.a.parameters
-            if x === StridedArray{T,N}
+            if x == StridedArray{T,N}
                 print(io, "StridedArray")
                 show_delim_array(io, x.a.parameters, '{', ',', '}', false)
                 return
-            elseif x === StridedVecOrMat{T}
+            elseif x == StridedVecOrMat{T}
                 print(io, "StridedVecOrMat")
                 show_delim_array(io, (x.a.parameters[1],), '{', ',', '}', false)
                 return
