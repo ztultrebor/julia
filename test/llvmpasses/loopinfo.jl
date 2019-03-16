@@ -8,6 +8,8 @@
 using InteractiveUtils
 using Printf
 
+using Base.Pragma
+
 ## Notes:
 # This script uses the `emit` function (defined at the end) to emit either
 # optimized or unoptimized LLVM IR. Each function is emitted individually and
@@ -69,9 +71,8 @@ end
 # LOWER-LABEL: @julia_loop_unroll
 # FINAL-LABEL: @julia_loop_unroll
 @eval function loop_unroll(N)
-    for i in 1:N
+    @unroll 3 for i in 1:N
         iteration(i)
-        $(Expr(:loopinfo, (Symbol("llvm.loop.unroll.count"), 3)))
 # CHECK: call void @julia.loopinfo_marker(), {{.*}}, !julia.loopinfo [[LOOPINFO3:![0-9]+]]
 # LOWER-NOT: call void @julia.loopinfo_marker()
 # LOWER: br {{.*}}, !llvm.loop [[LOOPID3:![0-9]+]]
@@ -91,13 +92,12 @@ end
 # LOWER-LABEL: @julia_loop_unroll2
 # FINAL-LABEL: @julia_loop_unroll2
 @eval function loop_unroll2(J, I)
-    for i in 1:10
+    @unroll for i in 1:10
         for j in J
             1 <= j <= I && continue
             @show (i,j)
             iteration(i)
         end
-        $(Expr(:loopinfo, (Symbol("llvm.loop.unroll.full"),)))
 # CHECK: call void @julia.loopinfo_marker(), {{.*}}, !julia.loopinfo [[LOOPINFO4:![0-9]+]]
 # LOWER-NOT: call void @julia.loopinfo_marker()
 # LOWER: br {{.*}}, !llvm.loop [[LOOPID4:![0-9]+]]
