@@ -231,9 +231,11 @@ includedir_rel := $(shell $(JULIAHOME)/contrib/relative_path.sh $(bindir) $(incl
 INSTALL_F := $(JULIAHOME)/contrib/install.sh 644
 INSTALL_M := $(JULIAHOME)/contrib/install.sh 755
 
-# BinaryBuilder options
-USE_BINARYBUILDER_OPENBLAS := 0
-USE_BINARYBUILDER_LLVM := 0
+# BinaryBuilder options.  We default to "on" for all the projects listed in BB_PROJECTS
+USE_BINARYBUILDER := 1
+BB_PROJECTS := OPENBLAS LLVM SUITESPARSE OPENLIBM GMP
+$(foreach proj,$(BB_PROJECTS),$(eval USE_BINARYBUILDER_$(proj) = $(USE_BINARYBUILDER)))
+
 # Use the Assertions build
 BINARYBUILDER_LLVM_ASSERTS := 0
 
