@@ -357,9 +357,10 @@ Returns `Millisecond(1)` for `DateTime` values, `Day(1)` for `Date` values, and 
 """
 Base.eps
 
-Base.eps(dt::DateTime) = Millisecond(1)
-Base.eps(dt::Date) = Day(1)
-Base.eps(t::Time) = Nanosecond(1)
+Base.eps(::Type{DateTime}) = Millisecond(1)
+Base.eps(::Type{Date}) = Day(1)
+Base.eps(::Type{Time}) = Nanosecond(1)
+Base.eps(::T) where T <: TimeType = eps(T)
 
 Base.typemax(::Union{DateTime, Type{DateTime}}) = DateTime(146138512, 12, 31, 23, 59, 59)
 Base.typemin(::Union{DateTime, Type{DateTime}}) = DateTime(-146138511, 1, 1, 0, 0, 0)

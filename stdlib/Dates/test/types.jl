@@ -181,6 +181,9 @@ c = Dates.Time(0)
 @testset "DateTime traits" begin
     @test Dates.calendar(a) == Dates.ISOCalendar
     @test Dates.calendar(b) == Dates.ISOCalendar
+    @test eps(typeof(a)) == Dates.Millisecond(1)
+    @test eps(typeof(b)) == Dates.Day(1)
+    @test eps(typeof(c)) == Dates.Nanosecond(1)
     @test eps(a) == Dates.Millisecond(1)
     @test eps(b) == Dates.Day(1)
     @test eps(c) == Dates.Nanosecond(1)
