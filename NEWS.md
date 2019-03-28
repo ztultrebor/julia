@@ -67,6 +67,7 @@ Standard library changes
 #### Dates
 
 * Fixed `repr` such that it displays `DateTime` as it would be entered in Julia ([#30200]).
+* The `eps` function now accepts `TimeType` types ([#31487]).
 
 #### Miscellaneous
 
@@ -109,3 +110,4 @@ Deprecated or removed
 [#30724]: https://github.com/JuliaLang/julia/issues/30724
 [#30915]: https://github.com/JuliaLang/julia/issues/30915
 [#30919]: https://github.com/JuliaLang/julia/issues/30919
+[#31487]: https://github.com/JuliaLang/julia/issues/31487
