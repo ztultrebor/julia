@@ -160,8 +160,17 @@ function typeinf_yakcs!(me::InferenceState)
             # No InferenceResult, since we don't actually use the return type
             argtypes = Any[argextype(stmt.args[2], me.src, me.sptypes)]
             dt = unwrap_unionall(t)
-            for p in dt.parameters[1].parameters
-                push!(argtypes, rewrap_unionall(p, t))
+            if isa(dt.parameters[1], TypeVar)
+                push!(argtypes, Any)
+            else
+                TT = dt.parameters[1]
+                if isa(TT, Union)
+                    TT = tuplemerge(TT.a, TT.b)
+                end
+                !isa(TT, Union) || continue
+                for p in TT.parameters
+                    push!(argtypes, rewrap_unionall(p, t))
+                end
             end
             state = InferenceState(nothing, copy(stmt.args[3]), false, me.params, argtypes)
             typeinf_local(state)

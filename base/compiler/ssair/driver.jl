@@ -49,7 +49,22 @@ function normalize(@nospecialize(stmt), meta::Vector{Any})
     return stmt
 end
 
-function just_construct_ssa(ci::CodeInfo, code::Vector{Any}, nargs::Int, sv::OptimizationState, strip::Bool=true)
+function add_yakc_argtypes!(argtypes, t)
+    dt = unwrap_unionall(t)
+    if isa(dt.parameters[1], TypeVar) || isa(dt.parameters[1].parameters[1], TypeVar)
+        push!(argtypes, Any)
+    else
+        TT = dt.parameters[1].parameters[1]
+        if isa(TT, Union)
+            TT = tuplemerge(TT.a, TT.b)
+        end
+        for p in TT.parameters
+            push!(argtypes, rewrap_unionall(p, t))
+        end
+    end
+end
+
+function just_construct_ssa(ci::CodeInfo, code::Vector{Any}, nargs::Int, sv::OptimizationState, argtypes::Vector{Any}=sv.slottypes, strip::Bool=true)
     # Go through and add an unreachable node after every
     # Union{} call. Then reindex labels.
     idx = 1
@@ -67,9 +82,11 @@ function just_construct_ssa(ci::CodeInfo, code::Vector{Any}, nargs::Int, sv::Opt
                 if length(stmt.args) == 3 && isa(stmt.args[3], CodeInfo)
                     t = widenconst(argextype(stmt.args[1], ci, sv.sptypes))
                     if t <: Type{<:Core.YAKC}
-                        yakc_nargs = length(unwrap_unionall(t).parameters[1].parameters[1].parameters)
+                        
+                        argtypes′ = Any[argextype(stmt.args[2], ci, sv.sptypes)]
+                        add_yakc_argtypes!(argtypes′, t)
                         yakc_ir = just_construct_ssa(stmt.args[3], copy_exprargs(stmt.args[3].code),
-                                yakc_nargs, sv, false)
+                                length(argtypes′)-1, sv, argtypes′, false)
                         push!(yakcs, yakc_ir)
                         stmt.head = :new_yakc
                         push!(stmt.args, length(yakcs))
@@ -123,20 +140,28 @@ function just_construct_ssa(ci::CodeInfo, code::Vector{Any}, nargs::Int, sv::Opt
     defuse_insts = scan_slot_def_use(nargs, ci, code)
     @timeit "domtree 1" domtree = construct_domtree(cfg)
     ir = let code = Any[nothing for _ = 1:length(code)]
-            IRCode(code, Any[], ci.codelocs, flags, cfg, collect(LineInfoNode, ci.linetable), sv.slottypes, meta, sv.sptypes, yakcs)
+            IRCode(code, Any[], ci.codelocs, flags, cfg, collect(LineInfoNode, ci.linetable), argtypes, meta, sv.sptypes, yakcs)
         end
-    @timeit "construct_ssa" ir = construct_ssa!(ci, code, ir, domtree, defuse_insts, nargs, sv.sptypes, sv.slottypes)
+    @timeit "construct_ssa" ir = construct_ssa!(ci, code, ir, domtree, defuse_insts, nargs, sv.sptypes, argtypes)
     return ir
+end
+
+function compact_all!(ir::IRCode)
+    length(ir.stmts) == 0 && return ir
+    for i in 1:length(ir.yakcs)
+        ir.yakcs[i] = compact_all!(ir.yakcs[i])
+    end
+    compact!(ir)
 end
 
 function run_passes(ci::CodeInfo, nargs::Int, sv::OptimizationState)
     ir = just_construct_ssa(ci, copy_exprargs(ci.code), nargs, sv)
     #@Base.show ("after_construct", ir)
     # TODO: Domsorting can produce an updated domtree - no need to recompute here
-    @timeit "compact 1" ir = compact!(ir)
-    @timeit "Inlining" ir = ssa_inlining_pass!(ir, ir.linetable, sv)
-    #@timeit "verify 2" verify_ir(ir)
-    ir = compact!(ir)
+    @timeit "compact 1" ir = compact_all!(ir)
+    @timeit "Inlining" ir = ssa_inlining_pass!(ir, ir.linetable, sv, true)
+    @timeit "verify 2" verify_ir(ir)
+    ir = compact_all!(ir)
     #@Base.show ("before_sroa", ir)
     @timeit "domtree 2" domtree = construct_domtree(ir.cfg)
     @timeit "SROA" ir = getfield_elim_pass!(ir, domtree)
@@ -145,7 +170,7 @@ function run_passes(ci::CodeInfo, nargs::Int, sv::OptimizationState)
     ir = adce_pass!(ir)
     #@Base.show ("after_adce", ir)
     @timeit "type lift" ir = type_lift_pass!(ir)
-    @timeit "compact 3" ir = compact!(ir)
+    @timeit "compact 3" ir = compact_all!(ir)
     #@Base.show ir
     if JLOptions().debug_level == 2
         @timeit "verify 3" (verify_ir(ir); verify_linetable(ir.linetable))

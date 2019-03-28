@@ -65,13 +65,13 @@ struct UnionSplit
 end
 isinvoke(inl::UnionSplit) = false
 
-function ssa_inlining_pass!(ir::IRCode, linetable::Vector{LineInfoNode}, sv::OptimizationState)
+function ssa_inlining_pass!(ir::IRCode, linetable::Vector{LineInfoNode}, sv::OptimizationState, allow_unionsplit=true)
     for (idx, ir′) in enumerate(ir.yakcs)
-        ir.yakcs[idx] = ssa_inlining_pass!(ir′, ir′.linetable, sv)
+        ir.yakcs[idx] = ssa_inlining_pass!(ir′, ir′.linetable, sv, allow_unionsplit)
     end
     # Go through the function, performing simple ininlingin (e.g. replacing call by constants
     # and analyzing legality of inlining).
-    @timeit "analysis" todo = assemble_inline_todo!(ir, sv)
+    @timeit "analysis" todo = assemble_inline_todo!(ir, sv, allow_unionsplit)
     isempty(todo) && return ir
     # Do the actual inlining for every call we identified
     @timeit "execution" ir = batch_inline!(todo, ir, linetable, sv.src.propagate_inbounds)
@@ -342,6 +342,8 @@ function ir_inline_item!(compact::IncrementalCompact, idx::Int, argexprs::Vector
                     compact_exprtype(compact, stmt′.val) :
                     compact_exprtype(inline_compact, stmt′.val)
                 break
+            elseif isexpr(stmt′, :new_yakc)
+                stmt′ = Expr(:new_yakc, stmt′.args[1], stmt′.args[2], stmt′.args[3], stmt′.args[4] + length(compact.ir.yakcs))
             end
             inline_compact[idx′] = stmt′
         end
@@ -359,7 +361,7 @@ function ir_inline_item!(compact::IncrementalCompact, idx::Int, argexprs::Vector
         inline_compact = IncrementalCompact(compact, item.ir, compact.result_idx)
         for (idx′, stmt′) in inline_compact
             inline_compact[idx′] = nothing
-            stmt′ = ssa_substitute!(idx′, stmt′, argexprs, item.method.sig, item.sparams, linetable_offset, boundscheck_idx, compact)
+            stmt′ = ssa_substitute!(idx′, stmt′, argexprs, item.method === nothing ? nothing : item.method.sig, item.sparams, linetable_offset, boundscheck_idx, compact)
             if isa(stmt′, ReturnNode)
                 if isdefined(stmt′, :val)
                     val = stmt′.val
@@ -379,7 +381,6 @@ function ir_inline_item!(compact::IncrementalCompact, idx::Int, argexprs::Vector
                         push!(pn.values, val)
                         stmt′ = GotoNode(post_bb_id)
                     end
-
                 end
             elseif isa(stmt′, GotoNode)
                 stmt′ = GotoNode(stmt′.label + bb_offset)
@@ -389,6 +390,8 @@ function ir_inline_item!(compact::IncrementalCompact, idx::Int, argexprs::Vector
                 stmt′ = GotoIfNot(stmt′.cond, stmt′.dest + bb_offset)
             elseif isa(stmt′, PhiNode)
                 stmt′ = PhiNode(Any[edge+bb_offset for edge in stmt′.edges], stmt′.values)
+            elseif isexpr(stmt′, :new_yakc)
+                stmt′ = Expr(:new_yakc, stmt′.args[1], stmt′.args[2], stmt′.args[3], stmt′.args[4] + length(compact.ir.yakcs))
             end
             inline_compact[idx′] = stmt′
         end
@@ -407,6 +410,8 @@ function ir_inline_item!(compact::IncrementalCompact, idx::Int, argexprs::Vector
             return_value = insert_node_here!(compact, pn, compact_exprtype(compact, SSAValue(idx)), compact.result_lines[idx])
         end
     end
+    append!(compact.ir.yakcs, item.ir.yakcs)
+    empty!(item.ir.stmts)
     return_value
 end
 
@@ -868,7 +873,6 @@ function call_sig(ir::IRCode, stmt::Expr)
     f = singleton_type(ft)
     f === Core.Intrinsics.llvmcall && return nothing
     f === Core.Intrinsics.cglobal && return nothing
-
     atypes = Vector{Any}(undef, length(stmt.args))
     atypes[1] = ft
     ok = true
@@ -984,7 +988,7 @@ function process_simple!(ir::IRCode, idx::Int, params::Params)
     return (sig, invoke_data)
 end
 
-function assemble_inline_todo!(ir::IRCode, sv::OptimizationState)
+function assemble_inline_todo!(ir::IRCode, sv::OptimizationState, allow_unionsplit::Bool=true)
     # todo = (inline_idx, (isva, isinvoke, na), method, spvals, inline_linetable, inline_ir, lie)
     todo = Any[]
     for idx in 1:length(ir.stmts)
@@ -1003,7 +1007,7 @@ function assemble_inline_todo!(ir::IRCode, sv::OptimizationState)
 
         # Special case: Calling a yakc whose definition we can see
         #@show ft
-        if ft ⊑ Core.YAKC
+        if sig.ft ⊑ Core.YAKC
             callee = stmt.args[1]
             if isa(callee, SSAValue) && isexpr(ir.stmts[callee.id], :new_yakc) && length(ir.stmts[callee.id].args) == 4
                 ir′ = ir.yakcs[ir.stmts[callee.id].args[4]::Int]::IRCode
@@ -1011,6 +1015,10 @@ function assemble_inline_todo!(ir::IRCode, sv::OptimizationState)
                     ir′.linetable, ir′, linear_inline_eligible(ir′)))
                 continue
             end
+            # Refuse to inline YAKCs we can't see otherwise, to preserve the
+            # possibility of functions higher in the call stack seeing this
+            # and performing the inlining.
+            continue
         end
 
         # Regular case: Perform method matching
@@ -1101,6 +1109,7 @@ function assemble_inline_todo!(ir::IRCode, sv::OptimizationState)
             continue
         end
         length(cases) == 0 && continue
+        allow_unionsplit || continue
         push!(todo, UnionSplit(idx, fully_covered, sig.atype, cases))
     end
     todo

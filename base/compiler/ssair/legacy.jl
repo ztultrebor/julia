@@ -18,6 +18,7 @@ function inflate_ir(ci::CodeInfo, sptypes::Vector{Any}, argtypes::Vector{Any})
         end
     end
     cfg = compute_basic_blocks(code)
+    yakcs = IRCode[]
     for i = 1:length(code)
         stmt = code[i]
         urs = userefs(stmt)
@@ -38,13 +39,27 @@ function inflate_ir(ci::CodeInfo, sptypes::Vector{Any}, argtypes::Vector{Any})
         elseif isa(stmt, Expr) && stmt.head == :enter
             stmt.args[1] = block_for_inst(cfg, stmt.args[1])
             code[i] = stmt
+        elseif isa(stmt, Expr) && stmt.head == :new
+            # Pre-convert any YAKC objects
+            if length(stmt.args) == 3 && isa(stmt.args[3], CodeInfo)
+                t = widenconst(argextype(stmt.args[1], ci, sptypes))
+                if t <: Type{<:Core.YAKC}
+                    argtypes′ = Any[argextype(stmt.args[2], ci, sptypes)]
+                    add_yakc_argtypes!(argtypes′, t)
+                    yakc_ir = inflate_ir(stmt.args[3], Any[], argtypes′)
+                    push!(yakcs, yakc_ir)
+                    stmt.head = :new_yakc
+                    push!(stmt.args, length(yakcs))
+                end
+            end
+            code[i] = stmt
         else
             code[i] = stmt
         end
     end
     ssavaluetypes = ci.ssavaluetypes isa Vector{Any} ? copy(ci.ssavaluetypes) : Any[ Any for i = 1:(ci.ssavaluetypes::Int) ]
     ir = IRCode(code, ssavaluetypes, copy(ci.codelocs), copy(ci.ssaflags), cfg, collect(LineInfoNode, ci.linetable),
-                argtypes, Any[], sptypes, IRCode[])
+                argtypes, Any[], sptypes, yakcs)
     return ir
 end
 

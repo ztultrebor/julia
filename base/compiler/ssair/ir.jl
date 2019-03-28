@@ -90,7 +90,7 @@ function basic_blocks_starts(stmts::Vector{Any})
                 # also tolerate expr form of IR
                 push!(jump_dests, idx+1)
                 push!(jump_dests, stmt.args[2]::Int)
-            elseif stmt.head === :return
+            elseif stmt.head === :return || stmt.head === :unreachable
                 # also tolerate expr form of IR
                 # This is a fake dest to force the next stmt to start a bb
                 idx < length(stmts) && push!(jump_dests, idx+1)
@@ -130,7 +130,7 @@ function compute_basic_blocks(stmts::Vector{Any})
     # Compute successors/predecessors
     for (num, b) in enumerate(blocks)
         terminator = stmts[last(b.stmts)]
-        if isa(terminator, ReturnNode) || isexpr(terminator, :return)
+        if isa(terminator, ReturnNode) || isexpr(terminator, :return) || isexpr(terminator, :unreachable)
             # return never has any successors
             continue
         end

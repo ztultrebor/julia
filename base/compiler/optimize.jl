@@ -289,6 +289,13 @@ function statement_cost(ex::Expr, line::Int, src::CodeInfo, sptypes::Vector{Any}
                 ftyp = argextype(farg, src, sptypes, slottypes)
             end
         end
+        # Give calls to YAKCs zero cost. The plan is for these to be a single
+        # indirect call so have very little cost. On the other hand, there
+        # is enormous benefit to inlining these into a function where we can
+        # see the definition of the YAKC. Perhaps this should even be negative
+        if widenconst(ftyp) <: Core.YAKC
+            return 0
+        end
         f = singleton_type(ftyp)
         if isa(f, IntrinsicFunction)
             iidx = Int(reinterpret(Int32, f::IntrinsicFunction)) + 1

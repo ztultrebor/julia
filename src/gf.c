@@ -2386,7 +2386,10 @@ JL_DLLEXPORT jl_value_t *jl_invoke(jl_method_instance_t *meth, jl_value_t **args
 JL_DLLEXPORT jl_value_t *jl_invoke_yakc(jl_yakc_t *yakc, jl_value_t *args)
 {
     // TODO: Compiler support
-    return jl_interpret_yakc(yakc, args);
+    jl_typeassert(args, jl_tparam0(jl_typeof(yakc)));
+    jl_value_t *ret = jl_interpret_yakc(yakc, args);
+    jl_typeassert(ret, jl_tparam1(jl_typeof(yakc)));
+    return ret;
 }
 
 // Return value is rooted globally
