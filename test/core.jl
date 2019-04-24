@@ -6922,3 +6922,8 @@ struct LL31783{T}
 end
 foo31783(tv::TypeVar) = tv.ub == Any ? Union{tv,LL31783{tv}} : tv
 @test isa(foo31783(TypeVar(:T)),Union)
+
+# issue #31696
+foo31696(x::Int8, y::Int8) = 1
+foo31696(x::T, y::T) where {T <: Int8} = 2
+@test length(methods(foo31696)) == 1
