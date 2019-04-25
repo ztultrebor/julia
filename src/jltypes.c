@@ -557,7 +557,8 @@ static int is_typekey_ordered(jl_value_t **key, size_t n)
         if (jl_is_datatype(k)) {
             if (!((jl_datatype_t *) k)->typekeyordered)
                 return 0;
-        } else {
+        }
+        else {
             if (jl_is_type(k) && k != jl_bottom_type && !wrapper_id(k))
                 return 0; // Union or UnionAll which is not a wrapper
         }
