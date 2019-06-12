@@ -407,6 +407,26 @@ _reperr(s, n, N) = throw(ArgumentError("number of " * s * " repetitions " *
     return R
 end
 
+struct EachSlice{A,I,L}
+    arr::A # underlying array
+    cartiter::I # CartesianIndices iterator
+    lookup::L # dimension look up: dimension index in cartiter, or nothing
+end
+
+function iterate(s::EachSlice, state...)
+    r = iterate(s.cartiter, state...)
+    isnothing(r) && return r
+    (c,nextstate) = r
+    view(s.arr, map(l -> isnothing(l) ? (:) : c[l], s.lookup)...), nextstate
+end
+
+size(s::EachSlice) = size(s.cartiter)
+length(s::EachSlice) = length(s.cartiter)
+ndims(s::EachSlice) = ndims(s.cartiter)
+IteratorSize(::Type{EachSlice{A,I,L}}) where {A,I,L} = IteratorSize(I)
+
+parent(s::EachSlice) = s.arr
+
 """
     eachrow(A::AbstractVecOrMat)
 
@@ -418,8 +438,13 @@ See also [`eachcol`](@ref) and [`eachslice`](@ref).
 !!! compat "Julia 1.1"
      This function requires at least Julia 1.1.
 """
-eachrow(A::AbstractVecOrMat) = (view(A, i, :) for i in axes(A, 1))
+function eachrow(A::AbstractVecOrMat)
+    iter = CartesianIndices((axes(A,1),))
+    lookup = (1,nothing)
+    EachSlice(A,iter,lookup)
+end
 
+const EachRow{A,I} = EachSlice{A,I,Tuple{Int,Nothing}}
 
 """
     eachcol(A::AbstractVecOrMat)
@@ -432,7 +457,12 @@ See also [`eachrow`](@ref) and [`eachslice`](@ref).
 !!! compat "Julia 1.1"
      This function requires at least Julia 1.1.
 """
-eachcol(A::AbstractVecOrMat) = (view(A, :, i) for i in axes(A, 2))
+function eachcol(A::AbstractVecOrMat)
+    iter = CartesianIndices((axes(A,2),))
+    lookup = (nothing,1)
+    EachSlice(A,iter,lookup)
+end
+const EachCol{A,I} = EachSlice{A,I,Tuple{Nothing,Int}}
 
 """
     eachslice(A::AbstractArray; dims)
@@ -449,9 +479,10 @@ See also [`eachrow`](@ref), [`eachcol`](@ref), and [`selectdim`](@ref).
      This function requires at least Julia 1.1.
 """
 @inline function eachslice(A::AbstractArray; dims)
-    length(dims) == 1 || throw(ArgumentError("only single dimensions are supported"))
-    dim = first(dims)
-    dim <= ndims(A) || throw(DimensionMismatch("A doesn't have $dim dimensions"))
-    idx1, idx2 = ntuple(d->(:), dim-1), ntuple(d->(:), ndims(A)-dim)
-    return (view(A, idx1..., i, idx2...) for i in axes(A, dim))
+    for dim in dims
+        dim <= ndims(A) || throw(DimensionMismatch("A doesn't have $dim dimensions"))
+    end
+    iter = CartesianIndices(map(dim -> axes(A,dim), dims))
+    lookup = ntuple(dim -> findfirst(isequal(dim), dims), ndims(A))
+    EachSlice(A,iter,lookup)
 end
