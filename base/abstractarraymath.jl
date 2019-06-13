@@ -415,15 +415,16 @@ end
 
 function iterate(s::EachSlice, state...)
     r = iterate(s.cartiter, state...)
-    isnothing(r) && return r
+    r === nothing && return r
     (c,nextstate) = r
-    view(s.arr, map(l -> isnothing(l) ? (:) : c[l], s.lookup)...), nextstate
+    view(s.arr, map(l -> l === nothing ? (:) : c[l], s.lookup)...), nextstate
 end
 
 size(s::EachSlice) = size(s.cartiter)
 length(s::EachSlice) = length(s.cartiter)
 ndims(s::EachSlice) = ndims(s.cartiter)
 IteratorSize(::Type{EachSlice{A,I,L}}) where {A,I,L} = IteratorSize(I)
+IteratorEltype(::Type{EachSlice{A,I,L}}) where {A,I,L} = EltypeUnknown()
 
 parent(s::EachSlice) = s.arr
 

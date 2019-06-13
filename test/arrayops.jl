@@ -2023,8 +2023,8 @@ using Base: eachrow, eachcol, EachRow, EachCol
     @test collect(eachrow(M)) == collect(eachslice(M, dims = 1)) == [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
     @test collect(eachcol(M)) == collect(eachslice(M, dims = 2)) == [[1, 4, 7], [2, 5, 8], [3, 6, 9]]
     @test_throws DimensionMismatch eachslice(M, dims = 4)
-    @test eltype(eachrow(M)) == typeof(first(eachrow(M)))
-    @test eltype(eachcol(M)) == typeof(first(eachcol(M)))
+    @test eltype(collect(eachrow(M))) == typeof(first(eachrow(M)))
+    @test eltype(collect(eachcol(M))) == typeof(first(eachcol(M)))
 
     # Higher-dimensional case
     M = reshape([(1:16)...], 2, 2, 2, 2)
@@ -2035,8 +2035,8 @@ using Base: eachrow, eachcol, EachRow, EachCol
     @test collect(eachslice(M, dims = (1,4)))[1, 2] == [9 13; 11 15]
     @test collect(eachslice(M, dims = (4,1)))[1, 1] == [1 5; 3 7]
     @test collect(eachslice(M, dims = (4,1)))[1, 2] == [2 6; 4 8]
-    @test eltype(eachslice(M, dims=1)) == typeof(first(eachslice(M, dims=1)))
-    @test eltype(eachslice(M, dims=(4,1))) == typeof(first(eachslice(M, dims=(4,1))))
+    @test eltype(collect(eachslice(M, dims=1))) == typeof(first(eachslice(M, dims=1)))
+    @test eltype(collect(eachslice(M, dims=(4,1)))) == typeof(first(eachslice(M, dims=(4,1))))
 end
 
 ###
