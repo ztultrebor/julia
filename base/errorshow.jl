@@ -601,12 +601,13 @@ function show_backtrace(io::IO, t::Vector{Any})
     end
 end
 
+# FIXME: Remove this and rely on the hidden meta
 function is_kw_sorter_name(name::Symbol)
     sn = string(name)
     return !startswith(sn, '#') && endswith(sn, "##kw")
 end
 
-function process_backtrace(t::Vector, limit::Int=typemax(Int); skipC = true)
+function process_backtrace(t::Vector, limit::Int=typemax(Int); min_importance=0)
     n = 0
     last_frame = StackTraces.UNKNOWN
     count = 0
@@ -618,12 +619,12 @@ function process_backtrace(t::Vector, limit::Int=typemax(Int); skipC = true)
         else
             lkups = StackTraces.lookup(lkups)
         end
-        for lkup in lkups
-            if lkup === StackTraces.UNKNOWN
+        for frame in lkups
+            if frame === StackTraces.UNKNOWN
                 continue
             end
 
-            if (lkup.from_c && skipC) || is_kw_sorter_name(lkup.func)
+            if StackTraces.frame_importance(frame) < min_importance || is_kw_sorter_name(lkup.func)
                 continue
             end
             count += 1
@@ -631,12 +632,13 @@ function process_backtrace(t::Vector, limit::Int=typemax(Int); skipC = true)
                 break
             end
 
-            if lkup.file != last_frame.file || lkup.line != last_frame.line || lkup.func != last_frame.func || lkup.linfo !== lkup.linfo
+            if frame.file != last_frame.file || frame.line != last_frame.line ||
+                    frame.func != last_frame.func || frame.linfo !== last_frame.linfo
                 if n > 0
                     push!(ret, (last_frame, n))
                 end
                 n = 1
-                last_frame = lkup
+                last_frame = frame
             else
                 n += 1
             end
