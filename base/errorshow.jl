@@ -235,15 +235,14 @@ function showerror(io::IO, ex::MethodError)
     if f_is_function && isdefined(Base, name)
         basef = getfield(Base, name)
         if basef !== ex.f && hasmethod(basef, arg_types)
-            println(io)
-            print(io, "You may have intended to import Base.", name)
+            print(io, "\nYou may have intended to import ")
+            show_unquoted(io, Expr(:., :Base, QuoteNode(name)))
         end
     end
     if (ex.world != typemax(UInt) && hasmethod(ex.f, arg_types) &&
         !hasmethod(ex.f, arg_types, world = ex.world))
         curworld = get_world_counter()
-        println(io)
-        print(io, "The applicable method may be too new: running in world age $(ex.world), while current world is $(curworld).")
+        print(io, "\nThe applicable method may be too new: running in world age $(ex.world), while current world is $(curworld).")
     end
     if !is_arg_types
         # Check for row vectors used where a column vector is intended.
@@ -326,11 +325,12 @@ function show_method_candidates(io::IO, ex::MethodError, @nospecialize kwargs=()
     for (func, arg_types_param) in funcs
         for method in methods(func)
             buf = IOBuffer()
-            iob = IOContext(buf, io)
+            iob0 = iob = IOContext(buf, io)
             tv = Any[]
             sig0 = method.sig
             while isa(sig0, UnionAll)
                 push!(tv, sig0.var)
+                iob = IOContext(iob, :unionall_env => sig0.var)
                 sig0 = sig0.body
             end
             s1 = sig0.parameters[1]
@@ -423,7 +423,7 @@ function show_method_candidates(io::IO, ex::MethodError, @nospecialize kwargs=()
                     length(kwords) > 0 && print(iob, "; ", join(kwords, ", "))
                 end
                 print(iob, ")")
-                show_method_params(iob, tv)
+                show_method_params(iob0, tv)
                 print(iob, " at ", method.file, ":", method.line)
                 if !isempty(kwargs)
                     unexpected = Symbol[]
@@ -454,8 +454,7 @@ function show_method_candidates(io::IO, ex::MethodError, @nospecialize kwargs=()
 
     if !isempty(lines) # Display up to three closest candidates
         Base.with_output_color(:normal, io) do io
-            println(io)
-            print(io, "Closest candidates are:")
+            print(io, "\nClosest candidates are:")
             sort!(lines, by = x -> -x[2])
             i = 0
             for line in lines
@@ -523,7 +522,8 @@ function show_reduced_backtrace(io::IO, t::Vector, with_prefix::Bool)
             i = frame_counter
             j = p
             while i < length(t) && t[i] == t[j]
-                i+=1 ; j+=1
+                i += 1
+                j += 1
             end
             if j >= frame_counter-1
                 #= At least one cycle repeated =#
@@ -591,6 +591,7 @@ function show_backtrace(io::IO, t::Vector)
 end
 
 function show_backtrace(io::IO, t::Vector{Any})
+    # t is a pre-processed backtrace (ref #12856)
     if length(t) < BIG_STACKTRACE_SIZE
         try invokelatest(update_stackframes_callback[], t) catch end
         for entry in t
@@ -606,21 +607,31 @@ function process_backtrace(t::Vector, limit::Int=typemax(Int); skipC = true)
     last_frame = StackTraces.UNKNOWN
     count = 0
     ret = Any[]
-    for i = eachindex(t)
-        lkups = StackTraces.lookup(t[i])
+    for i in eachindex(t)
+        lkups = t[i]
+        if lkups isa StackFrame
+            lkups = [lkups]
+        elseif lkups isa Base.InterpreterIP
+            lkups = StackTraces.lookupat(lkups)
+        else
+            lkups = StackTraces.lookupat(lkups - 1)
+        end
         for lkup in lkups
             if lkup === StackTraces.UNKNOWN
                 continue
             end
 
-            if lkup.from_c && skipC; continue; end
-            if i == 1 && lkup.func == :error; continue; end
+            if lkup.from_c && skipC
+                continue
+            end
             count += 1
-            if count > limit; break; end
+            if count > limit
+                break
+            end
 
             if lkup.file != last_frame.file || lkup.line != last_frame.line || lkup.func != last_frame.func || lkup.linfo !== lkup.linfo
                 if n > 0
-                    push!(ret, (last_frame,n))
+                    push!(ret, (last_frame, n))
                 end
                 n = 1
                 last_frame = lkup
@@ -628,9 +639,10 @@ function process_backtrace(t::Vector, limit::Int=typemax(Int); skipC = true)
                 n += 1
             end
         end
+        count > limit && break
     end
     if n > 0
-        push!(ret, (last_frame,n))
+        push!(ret, (last_frame, n))
     end
     return ret
 end

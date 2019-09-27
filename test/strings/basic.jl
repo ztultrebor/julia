@@ -113,7 +113,15 @@ end
     @test endswith(z, z)
 end
 
-@test filter(x -> x ∈ ['f', 'o'], "foobar") == "foo"
+@testset "filter specialization on String issue #32460" begin
+     @test filter(x -> x ∉ ['작', 'Ï', 'z', 'ξ'],
+                  GenericString("J'étais n작작é pour plaiÏre à toute âξme un peu fière")) ==
+                  "J'étais né pour plaire à toute âme un peu fière"
+     @test filter(x -> x ∉ ['작', 'Ï', 'z', 'ξ'],
+                  "J'étais n작작é pour plaiÏre à toute âξme un peu fière") ==
+                  "J'étais né pour plaire à toute âme un peu fière"
+     @test filter(x -> x ∈ ['f', 'o'], GenericString("foobar")) == "foo"
+end
 
 @testset "string iteration, and issue #1454" begin
     str = "é"
@@ -375,6 +383,12 @@ end
     @test tryparse(Float64, "64o") === nothing
     @test tryparse(Float32, "32") == 32.0f0
     @test tryparse(Float32, "32o") === nothing
+end
+
+@testset "tryparse invalid chars" begin
+    # #32314: tryparse shouldn't throw, even given strings with invalid Chars
+    @test tryparse(UInt8, "\xb5")    === nothing
+    @test tryparse(UInt8, "100\xb5") === nothing  # Code path for numeric overflow
 end
 
 import Unicode
