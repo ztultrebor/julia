@@ -350,9 +350,9 @@ tofloat(x::BigFloat) = x
         x = Float64(x)
     end
     if T <: Union{Val{'e'}, Val{'E'}}
-        newpos = Ryu.writeexp(buf, pos, x, plus, space, hash, prec, char(T), UInt8('.'))
+        newpos = Ryu.writeexp(buf, pos, x, prec, plus, space, hash, char(T), UInt8('.'))
     elseif T <: Union{Val{'f'}, Val{'F'}}
-        newpos = Ryu.writefixed(buf, pos, x, plus, space, hash, prec, UInt8('.'))
+        newpos = Ryu.writefixed(buf, pos, x, prec, plus, space, hash, UInt8('.'))
     elseif T <: Union{Val{'g'}, Val{'G'}}
         prec = prec == 0 ? 1 : prec
         x = round(x, sigdigits=prec)
@@ -700,18 +700,18 @@ macro printf(io_or_fmt, args...)
     if io_or_fmt isa String
         io = stdout
         fmt = Format(io_or_fmt)
-        return esc(:(Base.Printf.format($io, $fmt, $(args...))))
+        return esc(:($Printf.format($io, $fmt, $(args...))))
     else
         io = io_or_fmt
         isempty(args) && throw(ArgumentError("must provide required format string"))
         fmt = Format(args[1])
-        return esc(:(Base.Printf.format($io, $fmt, $(Base.tail(args)...))))
+        return esc(:($Printf.format($io, $fmt, $(Base.tail(args)...))))
     end
 end
 
 macro sprintf(fmt, args...)
     f = Format(fmt)
-    return esc(:(Base.Printf.format($f, $(args...))))
+    return esc(:($Printf.format($f, $(args...))))
 end
 
 end # module
