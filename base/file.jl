@@ -449,13 +449,18 @@ function tempdir()
         rc = ccall(:uv_os_tmpdir, Cint, (Ptr{UInt8}, Ptr{Csize_t}), buf, sz)
         if rc == 0
             resize!(buf, sz[])
-            return String(buf)
+            break
         elseif rc == Base.UV_ENOBUFS
             resize!(buf, sz[] - 1)  # space for null-terminator implied by StringVector
         else
             uv_error(:tmpdir, rc)
         end
     end
+    p = String(buf)
+    s = stat(p)
+    ispath(s) || error("tempdir path does not exist: $p")
+    isdir(s) || error("tempdir path is not a directory: $p")
+    return p
 end
 
 const TEMP_CLEANUP_MIN = Ref(1024)
