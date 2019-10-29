@@ -51,6 +51,7 @@ dmg/$(APP_NAME): startup.applescript julia.icns
 	tar zxf $(JULIAHOME)/$(JULIA_BINARYDIST_FILENAME).tar.gz -C $@/Contents/Resources/julia --strip-components 1
 	if [ -n "$$MACOS_CODESIGN_IDENTITY" ]; then \
 	    echo "Codesigning with identity $$MACOS_CODESIGN_IDENTITY"; \
+		find $@ -name \*.cstemp -type f -delete; \
 		codesign -s "$$MACOS_CODESIGN_IDENTITY" -v --deep $@; \
 	else \
 		true; \
