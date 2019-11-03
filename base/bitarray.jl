@@ -15,6 +15,11 @@ over `Array{Bool, N}` and allowing some operations to work on 64 values at once.
 By default, Julia returns `BitArrays` from [broadcasting](@ref Broadcasting) operations
 that generate boolean elements (including dotted-comparisons like `.==`) as well as from
 the functions [`trues`](@ref) and [`falses`](@ref).
+
+Note that extra care has to be taken with regards to thread safety when
+mutating a ` BitArray` due to its packed storage format. In particular, `A[i]`
+and `A[i+n]` for `n < 64` might share storage so mutating the value at these indices
+in parallel would, in general, be racy.
 """
 mutable struct BitArray{N} <: AbstractArray{Bool, N}
     chunks::Vector{UInt64}
