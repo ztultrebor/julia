@@ -17,9 +17,10 @@ that generate boolean elements (including dotted-comparisons like `.==`) as well
 the functions [`trues`](@ref) and [`falses`](@ref).
 
 Note that extra care has to be taken with regards to thread safety when
-mutating a ` BitArray` due to its packed storage format. In particular, `A[i]`
-and `A[i+n]` for `n < 64` might share storage so any concurrent access to these
-values where at least one of them is a write is not thread safe.
+mutating a `BitArray` due to its packed storage format. In particular, `A[i]`
+and `A[i+n]` for `(i-1)%64 == 0` and `1 <= n <= 63` shares storage so any
+concurrent access to these values where at least one of them is a write is not
+thread safe.
 """
 mutable struct BitArray{N} <: AbstractArray{Bool, N}
     chunks::Vector{UInt64}
