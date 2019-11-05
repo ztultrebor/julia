@@ -18,7 +18,7 @@ the functions [`trues`](@ref) and [`falses`](@ref).
 
 Note that extra care has to be taken with regards to thread safety when
 mutating a `BitArray` due to its packed storage format. In particular, `A[i]`
-and `A[i+n]` for `(i-1)%64 == 0` and `1 <= n <= 63` shares storage so any
+and `A[i+n]` share storage if `n` is small (that is, if `n <= 64 - mod1(i, 64)`) so any
 concurrent access to these values where at least one of them is a write is not
 thread safe.
 """
