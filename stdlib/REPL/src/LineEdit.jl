@@ -44,6 +44,7 @@ show(io::IO, x::Prompt) = show(io, string("Prompt(\"", prompt_string(x.prompt), 
 
 mutable struct MIState
     interface::ModalInterface
+    active_module::Module
     current_mode::TextInterface
     aborted::Bool
     mode_state::IdDict{Any,Any}
@@ -55,7 +56,7 @@ mutable struct MIState
     current_action::Symbol
 end
 
-MIState(i, c, a, m) = MIState(i, c, a, m, String[], 0, Char[], 0, :none, :none)
+MIState(i, mod, c, a, m) = MIState(i, mod, c, a, m, String[], 0, Char[], 0, :none, :none)
 
 function show(io::IO, s::MIState)
     print(io, "MI State (", mode(s), " active)")
@@ -149,7 +150,7 @@ struct EmptyHistoryProvider <: HistoryProvider end
 
 reset_state(::EmptyHistoryProvider) = nothing
 
-complete_line(c::EmptyCompletionProvider, s) = [], true, true
+complete_line(c::EmptyCompletionProvider, s, mod) = [], true, true
 
 terminal(s::IO) = s
 terminal(s::PromptState) = s.terminal
@@ -317,7 +318,7 @@ end
 # Prompt Completions
 function complete_line(s::MIState)
     set_action!(s, :complete_line)
-    if complete_line(state(s), s.key_repeats)
+    if complete_line(state(s), s.key_repeats, s.active_module)
         return refresh_line(s)
     else
         beep(s)
@@ -325,8 +326,8 @@ function complete_line(s::MIState)
     end
 end
 
-function complete_line(s::PromptState, repeats)
-    completions, partial, should_complete = complete_line(s.p.complete, s)
+function complete_line(s::PromptState, repeats, mod::Module)
+    completions, partial, should_complete = complete_line(s.p.complete, s, mod)
     isempty(completions) && return false
     if !should_complete
         # should_complete is false for cases where we only want to show
@@ -1770,8 +1771,8 @@ mode(s::SearchState) = @assert false
 mode(s::PrefixSearchState) = s.histprompt.parent_prompt
 
 # Search Mode completions
-function complete_line(s::SearchState, repeats)
-    completions, partial, should_complete = complete_line(s.histprompt.complete, s)
+function complete_line(s::SearchState, repeats, mod::Module)
+    completions, partial, should_complete = complete_line(s.histprompt.complete, s, mod)
     # For now only allow exact completions in search mode
     if length(completions) == 1
         prev_pos = position(s)
@@ -2334,7 +2335,7 @@ init_state(terminal, prompt::Prompt) =
                 #=indent(spaces)=# -1, Threads.SpinLock(), 0.0, -Inf)
 
 function init_state(terminal, m::ModalInterface)
-    s = MIState(m, m.modes[1], false, IdDict{Any,Any}())
+    s = MIState(m, Main, m.modes[1], false, IdDict{Any,Any}())
     for mode in m.modes
         s.mode_state[mode] = init_state(terminal, mode)
     end

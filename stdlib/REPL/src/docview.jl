@@ -16,10 +16,10 @@ using InteractiveUtils: subtypes
 ## Help mode ##
 
 # This is split into helpmode and _helpmode to easier unittest _helpmode
-helpmode(io::IO, line::AbstractString) = :($REPL.insert_hlines($io, $(REPL._helpmode(io, line))))
-helpmode(line::AbstractString) = helpmode(stdout, line)
+helpmode(io::IO, line::AbstractString, mod::Module) = :($REPL.insert_hlines($io, $(REPL._helpmode(io, line, mod))))
+helpmode(line::AbstractString, mod::Module) = helpmode(stdout, line, mod)
 
-function _helpmode(io::IO, line::AbstractString)
+function _helpmode(io::IO, line::AbstractString, mod::Module=Main)
     line = strip(line)
     x = Meta.parse(line, raise = false, depwarn = false)
     expr =
@@ -37,7 +37,7 @@ function _helpmode(io::IO, line::AbstractString)
         end
     # the following must call repl(io, expr) via the @repl macro
     # so that the resulting expressions are evaluated in the Base.Docs namespace
-    :($REPL.@repl $io $expr)
+    :($REPL.@repl $io $expr $mod)
 end
 _helpmode(line::AbstractString) = _helpmode(stdout, line)
 
@@ -221,18 +221,18 @@ end
 
 # repl search and completions for help
 
-function repl_search(io::IO, s)
+function repl_search(io::IO, s, mod::Module)
     pre = "search:"
     print(io, pre)
-    printmatches(io, s, doc_completions(s), cols = displaysize(io)[2] - length(pre))
+    printmatches(io, s, doc_completions(s, mod), cols = displaysize(io)[2] - length(pre))
     println(io, "\n")
 end
-repl_search(s) = repl_search(stdout, s)
+repl_search(s) = repl_search(stdout, s, mod)
 
-function repl_corrections(io::IO, s)
+function repl_corrections(io::IO, s, mod::Module)
     print(io, "Couldn't find ")
     printstyled(io, s, '\n', color=:cyan)
-    print_correction(io, s)
+    print_correction(io, s, mod)
 end
 repl_corrections(s) = repl_corrections(stdout, s)
 
@@ -275,25 +275,26 @@ repl_latex(s::String) = repl_latex(stdout, s)
 
 macro repl(ex) repl(ex) end
 macro repl(io, ex) repl(io, ex) end
+macro repl(io, ex, mod) repl(io, ex, mod) end
 
-function repl(io::IO, s::Symbol)
+function repl(io::IO, s::Symbol, mod::Module=Main)
     str = string(s)
     quote
         repl_latex($io, $str)
-        repl_search($io, $str)
-        $(if !isdefined(Main, s) && !haskey(keywords, s)
-               :(repl_corrections($io, $str))
+        repl_search($io, $str, $mod)
+        $(if !isdefined(mod, s) && !haskey(keywords, s)
+               :(repl_corrections($io, $str, $mod))
           end)
         $(_repl(s))
     end
 end
 isregex(x) = isexpr(x, :macrocall, 3) && x.args[1] === Symbol("@r_str") && !isempty(x.args[3])
-repl(io::IO, ex::Expr) = isregex(ex) ? :(apropos($io, $ex)) : _repl(ex)
-repl(io::IO, str::AbstractString) = :(apropos($io, $str))
-repl(io::IO, other) = esc(:(@doc $other))
+repl(io::IO, ex::Expr, mod::Module=Main) = isregex(ex) ? :(apropos($io, $ex, $mod)) : _repl(ex)
+repl(io::IO, str::AbstractString, mod::Module=Main) = :(apropos($io, $str, $mod))
+repl(io::IO, other, mod=Main) = esc(:(@doc $other))
 #repl(io::IO, other) = lookup_doc(other) # TODO
 
-repl(x) = repl(stdout, x)
+repl(x, mod::Module=Main) = repl(stdout, x, mod)
 
 function _repl(x)
     if isexpr(x, :call)
@@ -508,8 +509,8 @@ end
 
 print_joined_cols(args...; cols = displaysize(stdout)[2]) = print_joined_cols(stdout, args...; cols=cols)
 
-function print_correction(io, word)
-    cors = levsort(word, accessible(Main))
+function print_correction(io, word, mod::Module)
+    cors = levsort(word, accessible(mod))
     pre = "Perhaps you meant "
     print(io, pre)
     print_joined_cols(io, cors, ", ", " or "; cols = displaysize(io)[2] - length(pre))
@@ -517,7 +518,7 @@ function print_correction(io, word)
     return
 end
 
-print_correction(word) = print_correction(stdout, word)
+print_correction(word) = print_correction(stdout, word, Main)
 
 # Completion data
 
@@ -537,8 +538,8 @@ accessible(mod::Module) =
      map(names, moduleusings(mod))...;
      builtins] |> unique |> filtervalid
 
-doc_completions(name) = fuzzysort(name, accessible(Main))
-doc_completions(name::Symbol) = doc_completions(string(name))
+doc_completions(name, mod::Module=Main) = fuzzysort(name, accessible(mod))
+doc_completions(name::Symbol, mod::Module=Main) = doc_completions(string(name), mod)
 
 
 # Searching and apropos
