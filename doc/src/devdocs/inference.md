@@ -27,12 +27,11 @@ mths = methods(convert, atypes)  # worth checking that there is only one
 m = first(mths)
 
 # Create variables needed to call `typeinf_code`
-params = Core.Compiler.Params(typemax(UInt))  # parameter is the world age,
-                                                        #   typemax(UInt) -> most recent
+interp = Core.Compiler.NativeInterpreter()
 sparams = Core.svec()      # this particular method doesn't have type-parameters
 optimize = true            # run all inference optimizations
 cached = false             # force inference to happen (do not use cached results)
-Core.Compiler.typeinf_code(m, atypes, sparams, optimize, cached, params)
+Core.Compiler.typeinf_code(interp, m, atypes, sparams, optimize, cached)
 ```
 
 If your debugging adventures require a `MethodInstance`, you can look it up by
@@ -98,10 +97,11 @@ where `f` is your function and `tt` is the Tuple-type of the arguments:
 f = fill
 tt = Tuple{Float64, Tuple{Int,Int}}
 # Create the objects we need to interact with the compiler
-params = Core.Compiler.Params(typemax(UInt))
+opt_params = Core.Compiler.OptimizationParams()
 mi = Base.method_instances(f, tt)[1]
 ci = code_typed(f, tt)[1][1]
-opt = Core.Compiler.OptimizationState(mi, params)
+interp = Core.Compiler.NativeInterpreter()
+opt = Core.Compiler.OptimizationState(mi, opt_params, interp)
 # Calculate cost of each statement
 cost(stmt::Expr) = Core.Compiler.statement_cost(stmt, -1, ci, opt.sptypes, opt.slottypes, opt.params)
 cost(stmt) = 0
