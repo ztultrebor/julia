@@ -29,6 +29,11 @@ ERROR: MyException: test exception
 """
 showerror(io::IO, ex) = show(io, ex)
 
+index_string(x::Any) = string(x)
+index_string(x::Slice) = index_string(x.indices)
+index_string(x::OneTo) = "1:" * string(x.stop)
+index_string(x::Colon) = ":"
+
 function showerror(io::IO, ex::BoundsError)
     print(io, "BoundsError")
     if isdefined(ex, :a)
@@ -40,7 +45,7 @@ function showerror(io::IO, ex::BoundsError)
             if isa(ex.i, AbstractRange)
                 print(io, ex.i)
             else
-                join(io, ex.i, ", ")
+                join(io, index_string.(ex.i), ", ")
             end
             print(io, ']')
         end
