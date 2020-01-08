@@ -72,6 +72,11 @@ FLAGS += -DUSE_POLLY_ACC
 FLAGS += -I$(shell $(LLVM_CONFIG_HOST) --src-root)/tools/polly/tools # Required to find GPURuntime/GPUJIT.h
 endif
 endif
+ifeq ($(USE_MLIR), 1)
+SRCS += dialect
+FLAGS += -DUSE_MLIR
+MLIR_FLAGS += -I$(shell $(LLVM_CONFIG_HOST) --includedir)
+endif
 else
 RUNTIME_SRCS += anticodegen
 LLVM_LIBS := support
@@ -86,7 +91,7 @@ SRCS += $(RUNTIME_SRCS)
 
 # headers are used for dependency tracking, while public headers will be part of the dist
 UV_HEADERS :=
-HEADERS := $(BUILDDIR)/julia_version.h $(wildcard $(SRCDIR)/support/*.h) $(addprefix $(SRCDIR)/,julia.h julia_assert.h julia_threads.h tls.h locks.h atomics.h julia_internal.h options.h timing.h)
+HEADERS := $(BUILDDIR)/julia_version.h $(wildcard $(SRCDIR)/support/*.h) $(addprefix $(SRCDIR)/,julia.h julia_assert.h julia_threads.h tls.h locks.h atomics.h julia_internal.h options.h timing.h dialect.h)
 PUBLIC_HEADERS := $(BUILDDIR)/julia_version.h $(wildcard $(SRCDIR)/support/*.h) $(addprefix $(SRCDIR)/,julia.h julia_assert.h julia_threads.h tls.h locks.h atomics.h julia_gcext.h)
 ifeq ($(USE_SYSTEM_LIBUV),0)
 UV_HEADERS += uv.h
@@ -165,6 +170,13 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%.cpp $(SRCDIR)/llvm-version.h $(HEADERS) $(LLVM_CONF
 	@$(call PRINT_CC, $(CXX) $(LLVM_CXXFLAGS) $(JCPPFLAGS) $(JCXXFLAGS) $(SHIPFLAGS) $(CXX_DISABLE_ASSERTION) -c $< -o $@)
 $(BUILDDIR)/%.dbg.obj: $(SRCDIR)/%.cpp $(SRCDIR)/llvm-version.h $(HEADERS) $(LLVM_CONFIG_ABSOLUTE) | $(BUILDDIR)
 	@$(call PRINT_CC, $(CXX) $(LLVM_CXXFLAGS) $(JCPPFLAGS) $(JCXXFLAGS) $(DEBUGFLAGS) -c $< -o $@)
+
+ifeq ($(USE_MLIR), 1)
+$(BUILDDIR)/%.h.inc: $(SRCDIR)/%.td | $(BUILDDIR)
+	@$(call PRINT_CC, $(MLIR_TBLGEN) $(MLIR_FLAGS) -gen-op-decls $< -o $@)
+$(BUILDDIR)/%.cpp.inc: $(SRCDIR)/%.td | $(BUILDDIR)
+	@$(call PRINT_CC, $(MLIR_TBLGEN) $(MLIR_FLAGS) -gen-op-defs $< -o $@)
+endif
 
 # public header rules
 $(eval $(call dir_target,$(build_includedir)/julia))
@@ -245,6 +257,10 @@ $(BUILDDIR)/processor.o $(BUILDDIR)/processor.dbg.obj: $(addprefix $(SRCDIR)/,pr
 $(BUILDDIR)/signal-handling.o $(BUILDDIR)/signal-handling.dbg.obj: $(addprefix $(SRCDIR)/,signals-*.c)
 $(BUILDDIR)/staticdata.o $(BUILDDIR)/staticdata.dbg.obj: $(SRCDIR)/processor.h $(SRCDIR)/builtin_proto.h
 $(BUILDDIR)/toplevel.o $(BUILDDIR)/toplevel.dbg.obj: $(SRCDIR)/builtin_proto.h
+ifeq ($(USE_MLIR), 1)
+$(BUILDDIR)/dialect.o $(BUILDDIR)/dialect.dbg.obj: $(BUILDDIR)/ops.cpp.inc
+$(SRCDIR)/dialect.h: $(BUILDDIR)/ops.h.inc
+endif
 
 $(addprefix $(BUILDDIR)/,threading.o threading.dbg.obj gc.o gc.dbg.obj init.c init.dbg.obj task.o task.dbg.obj): $(addprefix $(SRCDIR)/,threading.h)
 $(addprefix $(BUILDDIR)/,APInt-C.o APInt-C.dbg.obj runtime_intrinsics.o runtime_intrinsics.dbg.obj): $(SRCDIR)/APInt-C.h

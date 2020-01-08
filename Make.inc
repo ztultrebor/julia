@@ -926,6 +926,10 @@ LLVM_CONFIG_HOST = $(call spawn,$(LLVM_CONFIG))
 endif
 endif
 
+ifeq ($(USE_MLIR), 1)
+MLIR_TBLGEN := $(build_depsbindir)/mlir-tblgen$(EXE)
+endif
+
 ifeq ($(USE_SYSTEM_PCRE), 1)
 PCRE_CONFIG := pcre2-config
 else
