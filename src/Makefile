@@ -74,6 +74,7 @@ endif
 endif
 ifeq ($(USE_MLIR), 1)
 SRCS += dialect
+LLVMLINK += -lMLIR
 FLAGS += -DUSE_MLIR
 MLIR_FLAGS += -I$(shell $(LLVM_CONFIG_HOST) --includedir)
 endif
