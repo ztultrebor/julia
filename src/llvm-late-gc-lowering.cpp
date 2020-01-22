@@ -2062,7 +2062,7 @@ bool LateLowerGCFrame::CleanupIR(Function &F, State *S) {
 
                 // Set the tag.
                 auto store = builder.CreateStore(
-                    CI->getArgOperand(2),
+                    CI->getArgOperand(3),
                     EmitTagPtr(builder, T_prjlvalue, newI));
                 store->setMetadata(LLVMContext::MD_tbaa, tbaa_tag);
 

@@ -1233,8 +1233,8 @@ jl_code_instance_t *jl_compile_linfo(jl_method_instance_t *mi, jl_code_info_t *s
         if (!params->cached) {
             // caller demanded that we make a new copy
             jl_ptls_t ptls = jl_get_ptls_states();
-            jl_code_instance_t *uncached = (jl_code_instance_t*)jl_gc_alloc(ptls, sizeof(jl_code_instance_t),
-                    sizeof(jl_code_instance_type), jl_code_instance_type);
+            jl_code_instance_t *uncached = (jl_code_instance_t*)jl_gc_alloc(ptls,
+                    sizeof(jl_code_instance_t), 0, jl_code_instance_type);
             *uncached = *codeinst;
             uncached->functionObjectsDecls.functionObject = NULL;
             uncached->functionObjectsDecls.specFunctionObject = NULL;

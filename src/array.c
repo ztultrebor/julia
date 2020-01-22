@@ -53,6 +53,7 @@ static jl_array_t *_new_array_(jl_value_t *atype, uint32_t ndims, size_t *dims,
     size_t i, tot, nel = 1;
     void *data;
     jl_array_t *a;
+    assert(elalign);
 
     for (i = 0; i < ndims; i++) {
         size_t di = dims[i];
@@ -151,9 +152,12 @@ static inline jl_array_t *_new_array(jl_value_t *atype, uint32_t ndims, size_t *
     int isunboxed = jl_islayout_inline(eltype, &elsz, &al);
     int isunion = jl_is_uniontype(eltype);
     int hasptr = isunboxed && (jl_is_datatype(eltype) && ((jl_datatype_t*)eltype)->layout->npointers > 0);
-    if (isunboxed) {
+    if (!isunboxed) {
         elsz = sizeof(void*);
         al = elsz;
+    }
+    else {
+        elsz = LLT_ALIGN(elsz, al);
     }
 
     return _new_array_(atype, ndims, dims, isunboxed, hasptr, isunion, elsz, al);

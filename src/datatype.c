@@ -43,9 +43,8 @@ jl_sym_t *jl_demangle_typename(jl_sym_t *s) JL_NOTSAFEPOINT
 JL_DLLEXPORT jl_methtable_t *jl_new_method_table(jl_sym_t *name, jl_module_t *module)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
-    jl_methtable_t *mt =
-        (jl_methtable_t*)jl_gc_alloc(ptls, sizeof(jl_methtable_t), 0,
-                                     jl_methtable_type);
+    jl_methtable_t *mt = (jl_methtable_t*)jl_gc_alloc(ptls,
+            sizeof(jl_methtable_t), /*align*/ 0, jl_methtable_type);
     mt->name = jl_demangle_typename(name);
     mt->module = module;
     mt->defs = jl_nothing;
@@ -62,9 +61,8 @@ JL_DLLEXPORT jl_methtable_t *jl_new_method_table(jl_sym_t *name, jl_module_t *mo
 JL_DLLEXPORT jl_typename_t *jl_new_typename_in(jl_sym_t *name, jl_module_t *module)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
-    jl_typename_t *tn =
-        (jl_typename_t*)jl_gc_alloc(ptls, sizeof(jl_typename_t), 0,
-                                    jl_typename_type);
+    jl_typename_t *tn = (jl_typename_t*)jl_gc_alloc(ptls,
+            sizeof(jl_typename_t), /*align*/ 0, jl_typename_type);
     tn->name = name;
     tn->module = module;
     tn->wrapper = NULL;
@@ -86,7 +84,8 @@ jl_datatype_t *jl_new_abstracttype(jl_value_t *name, jl_module_t *module, jl_dat
 jl_datatype_t *jl_new_uninitialized_datatype(void)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
-    jl_datatype_t *t = (jl_datatype_t*)jl_gc_alloc(ptls, sizeof(jl_datatype_t), 0, jl_datatype_type);
+    jl_datatype_t *t = (jl_datatype_t*)jl_gc_alloc(ptls,
+            sizeof(jl_datatype_t), /*align*/ 0, jl_datatype_type);
     t->hasfreetypevars = 0;
     t->isdispatchtuple = 0;
     t->isbitstype = 0;
@@ -830,7 +829,7 @@ JL_DLLEXPORT jl_value_t *jl_box_char(uint32_t x)
     uint32_t u = bswap_32(x);
     if (u < 128)
         return boxed_char_cache[(uint8_t)u];
-    jl_value_t *v = jl_gc_alloc(ptls, sizeof(void*), jl_datatype_align(jl_char_type), jl_char_type);
+    jl_value_t *v = jl_gc_alloc(ptls, sizeof(void*), /*align*/ 0, jl_char_type);
     *(uint32_t*)jl_data_ptr(v) = x;
     return v;
 }

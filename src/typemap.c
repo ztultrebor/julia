@@ -887,9 +887,8 @@ static void jl_typemap_list_insert_sorted(
 static jl_typemap_level_t *jl_new_typemap_level(void)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
-    jl_typemap_level_t *cache =
-        (jl_typemap_level_t*)jl_gc_alloc(ptls, sizeof(jl_typemap_level_t), 0,
-                                         jl_typemap_level_type);
+    jl_typemap_level_t *cache = (jl_typemap_level_t*)jl_gc_alloc(ptls,
+            sizeof(jl_typemap_level_t), 0, jl_typemap_level_type);
     cache->key = NULL;
     cache->linear = (jl_typemap_entry_t*)jl_nothing;
     cache->any = jl_nothing;
@@ -1026,9 +1025,8 @@ jl_typemap_entry_t *jl_typemap_insert(jl_typemap_t **cache, jl_value_t *parent,
         simpletype = (jl_tupletype_t*)jl_nothing;
     jl_value_t *ttype = jl_unwrap_unionall((jl_value_t*)type);
 
-    jl_typemap_entry_t *newrec =
-        (jl_typemap_entry_t*)jl_gc_alloc(ptls, sizeof(jl_typemap_entry_t), 0,
-                                         jl_typemap_entry_type);
+    jl_typemap_entry_t *newrec = (jl_typemap_entry_t*)jl_gc_alloc(ptls,
+            sizeof(jl_typemap_entry_t), 0, jl_typemap_entry_type);
     newrec->sig = type;
     newrec->simplesig = simpletype;
     newrec->func.value = newvalue;
