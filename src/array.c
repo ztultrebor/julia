@@ -91,8 +91,8 @@ static jl_array_t *_new_array_(jl_value_t *atype, uint32_t ndims, size_t *dims,
             tsz = JL_ARRAY_ALIGN(tsz, elalign); // align data area
         size_t doffs = tsz;
         tsz += tot;
-        tsz = JL_ARRAY_ALIGN(tsz, JL_SMALL_BYTE_ALIGNMENT); // align whole object
         a = (jl_array_t*)jl_gc_alloc(ptls, tsz, elalign, atype);
+        tsz = JL_ARRAY_ALIGN(tsz + sizeof(void*), JL_SMALL_BYTE_ALIGNMENT) - sizeof(void*); // XXX: predict possible gc behavior
         // No allocation or safepoint allowed after this
         a->flags.how = 0;
         data = (char*)a + doffs;
@@ -100,11 +100,11 @@ static jl_array_t *_new_array_(jl_value_t *atype, uint32_t ndims, size_t *dims,
             memset(data, 0, tot);
     }
     else {
-        tsz = JL_ARRAY_ALIGN(tsz, JL_CACHE_BYTE_ALIGNMENT); // align whole object
         data = jl_gc_managed_malloc(tot);
         // Allocate the Array **after** allocating the data
         // to make sure the array is still young
-        a = (jl_array_t*)jl_gc_alloc(ptls, tsz, JL_CACHE_BYTE_ALIGNMENT, atype);
+        a = (jl_array_t*)jl_gc_alloc(ptls, tsz, JL_SMALL_BYTE_ALIGNMENT, atype);
+        tsz = JL_ARRAY_ALIGN(tsz + sizeof(void*), JL_SMALL_BYTE_ALIGNMENT) - sizeof(void*); // XXX: predict possible gc behavior
         // No allocation or safepoint allowed after this
         a->flags.how = 2;
         jl_gc_track_malloced_array(ptls, a);
