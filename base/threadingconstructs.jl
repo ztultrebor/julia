@@ -137,3 +137,6 @@ macro spawn(expr)
         end
     end
 end
+
+# This is a stub that can be overloaded for downstream structures like `Channel`
+function foreach end
