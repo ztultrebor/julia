@@ -138,10 +138,14 @@ install-suitesparse-wrapper: $(build_shlibdir)/libsuitesparse_wrapper.$(SHLIB_EX
 
 else # USE_BINARYBUILDER_SUITESPARSE
 
-SUITESPARSE_BB_URL_BASE := https://github.com/JuliaBinaryWrappers/SuiteSparse_jll.jl/releases/download/SuiteSparse-v$(SUITESPARSE_VER)+$(SUITESPARSE_BB_REL)
-SUITESPARSE_BB_NAME := SuiteSparse.v$(SUITESPARSE_VER)
+# SUITESPARSE_BB_URL_BASE := https://github.com/JuliaBinaryWrappers/SuiteSparse_jll.jl/releases/download/SuiteSparse-v$(SUITESPARSE_VER)+$(SUITESPARSE_BB_REL)
+# SUITESPARSE_BB_NAME := SuiteSparse.v$(SUITESPARSE_VER)
 
-$(eval $(call bb-install,suitesparse,SUITESPARSE,false))
+# $(eval $(call bb-install,suitesparse,false))
+
+$(eval $(call artifact-install,METIS_jll,METIS_JLL))
+$(eval $(call artifact-install,SuiteSparse_jll,SUITESPARSE_JLL))
+
 get-suitesparse-wrapper: get-suitesparse
 extract-suitesparse-wrapper: extract-suitesparse
 configure-suitesparse-wrapper: configure-suitesparse
@@ -152,6 +156,8 @@ clean-suitesparse-wrapper: clean-suitesparse
 distclean-suitesparse-wrapper: distclean-suitesparse
 install-suitesparse-wrapper: install-suitesparse
 
-# suitesparse depends on OpenBLAS
-compile-suitesparse: | $(build_prefix)/manifest/openblas
+# suitesparse depends on OpenBLAS and METIS
+compile-suitesparse: | $(build_prefix)/manifest/openblas $(build_prefix)/manifest/metis
+install-suitesparse: | $(build_prefix)/manifest/metis
+
 endif

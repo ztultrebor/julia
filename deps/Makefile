@@ -3,6 +3,7 @@ default: install
 SRCDIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 SRCCACHE := $(abspath $(SRCDIR)/srccache)
 JULIAHOME := $(abspath $(SRCDIR)/..)
+VERSDIR := v$(shell cut -d. -f1-2 < $(JULIAHOME)/VERSION)
 ifeq ($(abspath .),$(abspath $(SRCDIR)))
 BUILDDIR := scratch
 else
@@ -13,6 +14,7 @@ include $(JULIAHOME)/Make.inc
 include $(SRCDIR)/tools/common.mk
 include $(SRCDIR)/tools/git-external.mk
 include $(SRCDIR)/tools/bb-install.mk
+include $(SRCDIR)/tools/artifact-install.mk
 
 BUILDDIR := $(BUILDDIR)$(MAYBE_HOST)
 
@@ -152,13 +154,18 @@ ifeq ($(USE_SYSTEM_LAPACK), 0)
 DEP_LIBS += lapack
 endif
 endif
+DEP_LIBS += BLAS_jll
 
 ifneq ($(OS), WINNT)
 DEP_LIBS += libwhich
 endif
 
-DEP_LIBS_STAGED := $(filter-out suitesparse-wrapper osxunwind,$(DEP_LIBS)) # unlist targets that have not been converted to use the staged-install
+DEP_LIBS_STAGED := $(filter-out suitesparse-wrapper osxunwind BLAS_jll,$(DEP_LIBS)) # unlist targets that have not been converted to use the staged-install
 
+## Our JLLs require julia stdlibs to be installed, so we create this target to ensure that they exist properly
+julia-stdlib:
+	@$(MAKE) $(QUIET_MAKE) -C $(BUILDROOT)/stdlib
+.PHONY: julia-stdlib
 
 ## Common build target prefixes
 
@@ -183,6 +190,7 @@ include $(SRCDIR)/openlibm.mk
 include $(SRCDIR)/dsfmt.mk
 include $(SRCDIR)/objconv.mk
 include $(SRCDIR)/blas.mk
+include $(SRCDIR)/blas_jll.mk
 include $(SRCDIR)/utf8proc.mk
 include $(SRCDIR)/suitesparse.mk
 include $(SRCDIR)/unwind.mk

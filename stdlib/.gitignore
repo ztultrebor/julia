@@ -1,5 +1,11 @@
 /srccache
+
+# Pkg and Statistics are "external", so ignore them
 /Pkg-*
 /Pkg
 /Statistics-*
 /Statistics
+
+# All JLL packages are similarly "external", so ignore them as well
+/*_jll-*
+/*_jll

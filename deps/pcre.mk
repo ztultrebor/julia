@@ -58,6 +58,6 @@ else # USE_BINARYBUILDER_PCRE
 PCRE_BB_URL_BASE := https://github.com/JuliaPackaging/Yggdrasil/releases/download/PCRE2-v$(PCRE_VER)-$(PCRE_BB_REL)
 PCRE_BB_NAME := PCRE2.v$(PCRE_VER).0
 
-$(eval $(call bb-install,pcre,PCRE,false))
+$(eval $(call bb-install,pcre,false))
 
 endif

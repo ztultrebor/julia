@@ -664,6 +664,14 @@ JCXXFLAGS += -DGC_DEBUG_ENV
 JCFLAGS += -DGC_DEBUG_ENV
 endif
 
+# Some utility functions
+define uppercase
+$(shell echo $1 | tr a-z A-Z)
+endef
+define lowercase
+$(shell echo $1 | tr A-Z a-z)
+endef
+
 # ===========================================================================
 
 # Select the cpu architecture to target, or automatically detects the user's compiler
@@ -777,7 +785,7 @@ endif
 
 # File name of make binary-dist result
 ifeq ($(JULIA_BINARYDIST_FILENAME),)
-DIST_OS:=$(shell echo $(OS) | tr '[:upper:]' '[:lower:]')
+DIST_OS:=$(call lowercase,$(OS))
 ifeq (WINNT,$(OS))
 DIST_OS:=win
 endif

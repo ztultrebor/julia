@@ -67,5 +67,5 @@ else # USE_BINARYBUILDER_LIBUV
 LIBUV_BB_URL_BASE := https://github.com/JuliaPackaging/Yggdrasil/releases/download/LibUV-v2+$(LIBUV_VER)-julia+$(LIBUV_BB_REL)
 LIBUV_BB_NAME := LibUV.v2.0.0+$(LIBUV_VER)-julia
 
-$(eval $(call bb-install,libuv,LIBUV,false))
+$(eval $(call bb-install,libuv,false))
 endif

@@ -494,13 +494,14 @@ update-llvm:
 		git pull --ff-only
 endif
 else # USE_BINARYBUILDER_LLVM
-LLVM_BB_URL_BASE := https://github.com/JuliaBinaryWrappers/LLVM_jll.jl/releases/download/LLVM-v$(LLVM_VER)+$(LLVM_BB_REL)
 ifneq ($(BINARYBUILDER_LLVM_ASSERTS), 1)
+LLVM_BB_URL_BASE := https://github.com/JuliaBinaryWrappers/LLVM_jll.jl/releases/download/LLVM-v$(LLVM_VER)+$(LLVM_BB_REL)
 LLVM_BB_NAME := LLVM.v$(LLVM_VER)
 else
-LLVM_BB_NAME := LLVM.asserts.v$(LLVM_VER)
+LLVM_BB_URL_BASE := https://github.com/JuliaBinaryWrappers/LLVM_assert_jll.jl/releases/download/LLVM_assert-v$(LLVM_VER)+$(LLVM_BB_REL)
+LLVM_BB_NAME := LLVM_assert.v$(LLVM_VER)
 endif
 
-$(eval $(call bb-install,llvm,LLVM,false,true))
+$(eval $(call bb-install,llvm,false,true))
 
 endif # USE_BINARYBUILDER_LLVM
