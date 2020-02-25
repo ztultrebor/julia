@@ -1,4 +1,0 @@
-METIS_JLL_BRANCH = master
-METIS_JLL_SHA1 = 35f27bbd7bdb77bc97de2ed9d1c478c52f30e7bc
-METIS_JLL_GIT_URL := git://github.com/JuliaBinaryWrappers/METIS_jll.jl.git
-METIS_JLL_TAR_URL = https://api.github.com/repos/JuliaBinaryWrappers/METIS_jll.jl/tarball/$1

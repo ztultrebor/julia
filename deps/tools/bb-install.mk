@@ -5,25 +5,24 @@
 
 define bb-install
 TRIPLET_VAR := BB_TRIPLET
-UPPER_VAR := $(call uppercase,$(1))
+$(1)_UPPER_VAR := $(call uppercase,$(1))
 ifeq ($(2),true)
 TRIPLET_VAR := $$(TRIPLET_VAR)_LIBGFORTRAN
 endif
 ifeq ($(3),true)
 TRIPLET_VAR := $$(TRIPLET_VAR)_CXXABI
 endif
-$$(UPPER_VAR)_BB_TRIPLET := $$($$(TRIPLET_VAR))
-$$(UPPER_VAR)_BB_URL := $$($$(UPPER_VAR)_BB_URL_BASE)/$$($$(UPPER_VAR)_BB_NAME).$$($$(UPPER_VAR)_BB_TRIPLET).tar.gz
-$$(UPPER_VAR)_BB_BASENAME := $$($$(UPPER_VAR)_BB_NAME)-$$($$(UPPER_VAR)_BB_REL).$$($$(UPPER_VAR)_BB_TRIPLET).tar.gz
+$$($(1)_UPPER_VAR)_BB_TRIPLET := $$($$(TRIPLET_VAR))
+$$($(1)_UPPER_VAR)_BB_URL := $$($$($(1)_UPPER_VAR)_BB_URL_BASE)/$$($$($(1)_UPPER_VAR)_BB_NAME).$$($$($(1)_UPPER_VAR)_BB_TRIPLET).tar.gz
+$$($(1)_UPPER_VAR)_BB_BASENAME := $$($$($(1)_UPPER_VAR)_BB_NAME)-$$($$($(1)_UPPER_VAR)_BB_REL).$$($$($(1)_UPPER_VAR)_BB_TRIPLET).tar.gz
 
-$$(BUILDDIR)/$$($$(UPPER_VAR)_BB_NAME):
+$$(BUILDDIR)/$$($$($(1)_UPPER_VAR)_BB_NAME):
 	mkdir -p $$@
 
-$$(SRCCACHE)/$$($$(UPPER_VAR)_BB_BASENAME): | $$(SRCCACHE)
-	echo $$($$(UPPER_VAR)_BB_URL)
-	$$(JLDOWNLOAD) $$@ $$($$(UPPER_VAR)_BB_URL)
+$$(SRCCACHE)/$$($$($(1)_UPPER_VAR)_BB_BASENAME): | $$(SRCCACHE)
+	$$(JLDOWNLOAD) $$@ $$($$($(1)_UPPER_VAR)_BB_URL)
 
-stage-$(strip $1): $$(SRCCACHE)/$$($$(UPPER_VAR)_BB_BASENAME)
+stage-$(strip $1): $$(SRCCACHE)/$$($$($(1)_UPPER_VAR)_BB_BASENAME)
 install-$(strip $1): $$(build_prefix)/manifest/$(strip $1)
 
 reinstall-$(strip $1):
@@ -31,9 +30,9 @@ reinstall-$(strip $1):
 	+$$(MAKE) stage-$(strip $1)
 	+$$(MAKE) install-$(strip $1)
 
-UNINSTALL_$(strip $1) := $$($$(UPPER_VAR)_BB_BASENAME:.tar.gz=) bb-uninstaller
+UNINSTALL_$(strip $1) := $$($$($(1)_UPPER_VAR)_BB_BASENAME:.tar.gz=) bb-uninstaller
 
-$$(build_prefix)/manifest/$(strip $1): $$(SRCCACHE)/$$($$(UPPER_VAR)_BB_BASENAME) | $(build_prefix)/manifest
+$$(build_prefix)/manifest/$(strip $1): $$(SRCCACHE)/$$($$($(1)_UPPER_VAR)_BB_BASENAME) | $(build_prefix)/manifest
 	-+[ ! -e $$@ ] || $$(MAKE) uninstall-$(strip $1)
 	$$(JLCHECKSUM) $$<
 	mkdir -p $$(build_prefix)
@@ -41,11 +40,11 @@ $$(build_prefix)/manifest/$(strip $1): $$(SRCCACHE)/$$($$(UPPER_VAR)_BB_BASENAME
 	echo '$$(UNINSTALL_$(strip $1))' > $$@
 
 clean-bb-download-$(1):
-	rm -f $$(SRCCACHE)/$$($$(UPPER_VAR)_BB_BASENAME)
+	rm -f $$(SRCCACHE)/$$($$($(1)_UPPER_VAR)_BB_BASENAME)
 
 clean-$(1):
 distclean-$(1): clean-bb-download-$(1)
-get-$(1): $$(SRCCACHE)/$$($$(UPPER_VAR)_BB_BASENAME)
+get-$(1): $$(SRCCACHE)/$$($$($(1)_UPPER_VAR)_BB_BASENAME)
 extract-$(1):
 configure-$(1):
 compile-$(1): get-$(1)

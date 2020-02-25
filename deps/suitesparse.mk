@@ -136,15 +136,24 @@ fastcheck-suitesparse-wrapper: #none
 check-suitesparse-wrapper:
 install-suitesparse-wrapper: $(build_shlibdir)/libsuitesparse_wrapper.$(SHLIB_EXT)
 
+# If we built our own libsuitesparse, we need to generate a fake SuiteSparse_jll package to load it in:
+$(eval $(call jll-generate,SuiteSparse_jll,libsuitesparse=libsuitesparse \
+                                           libsuitesparse_wrapper=libsuitesparse_wrapper, \
+						   bea87d4a-7f5b-5778-9afe-8cc45184846c, \
+                           OpenBLAS_jll=4536629a-c528-5b80-bd46-f80d51c5b363))
+
 else # USE_BINARYBUILDER_SUITESPARSE
 
-# SUITESPARSE_BB_URL_BASE := https://github.com/JuliaBinaryWrappers/SuiteSparse_jll.jl/releases/download/SuiteSparse-v$(SUITESPARSE_VER)+$(SUITESPARSE_BB_REL)
-# SUITESPARSE_BB_NAME := SuiteSparse.v$(SUITESPARSE_VER)
+# Install SuiteSparse_jll into our stdlib folder
+$(eval $(call stdlib-external,SuiteSparse_jll,SUITESPARSE_JLL))
+install-suitesparse: install-SuiteSparse_jll
 
-# $(eval $(call bb-install,suitesparse,false))
+# Rewrite SuiteSparse_jll/src/*.jl to avoid dependencies on Pkg
+$(eval $(call jll-rewrite,SuiteSparse_jll))
 
-$(eval $(call artifact-install,METIS_jll,METIS_JLL))
-$(eval $(call artifact-install,SuiteSparse_jll,SUITESPARSE_JLL))
+# Install artifacts from SuiteSparse_jll into artifacts folder
+$(eval $(call artifact-install,SuiteSparse_jll))
+
 
 get-suitesparse-wrapper: get-suitesparse
 extract-suitesparse-wrapper: extract-suitesparse
@@ -156,8 +165,6 @@ clean-suitesparse-wrapper: clean-suitesparse
 distclean-suitesparse-wrapper: distclean-suitesparse
 install-suitesparse-wrapper: install-suitesparse
 
-# suitesparse depends on OpenBLAS and METIS
-compile-suitesparse: | $(build_prefix)/manifest/openblas $(build_prefix)/manifest/metis
-install-suitesparse: | $(build_prefix)/manifest/metis
-
+# suitesparse depends on OpenBLAS
+compile-suitesparse: | $(build_prefix)/manifest/openblas
 endif

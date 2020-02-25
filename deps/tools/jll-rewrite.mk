@@ -4,9 +4,13 @@
 # Parameters to the stdlib-external macro:
 #
 #   $1 = stdlib_name
-#   $2 = var_prefix (by convention, use upper cased stdlib_name)
 
 define jll-rewrite
+
+# Target name is lowercased prefix, e.g. "MbedTLS_jll" -> "mbedtls"
+$(1)_TARGET_NAME := $(or $(3),$(firstword $(subst _, ,$(call lowercase,$(1)))))
+# Convert from `MBEDTLS_JLL_SRC_DIR` to `MbedTLS_jll_SRC_DIR` for convenience
+$(1)_SRC_DIR := $(BUILDDIR)/$$($(call uppercase,$(1)_SRC_DIR))
 
 # We need to eliminate the JLL package's dependency on `Pkg`; this is because we need to
 # load things like `LibGit2_jll`, needed by `LibGit2`, which is itself needed by `Pkg`.
@@ -23,20 +27,22 @@ define jll-rewrite
 # - WRAPPER: the chosen wrapper `.jl` file within `src/wrappers`, which will get copied
 #   to GEN_SRC and used as the overall JLL module.
 # - REL_PATH: the julia code that points to the known-good artifact directory
-$$(BUILDDIR)/$$($2_SRC_DIR)/jll-rewritten: $$(BUILDDIR)/$$($2_SRC_DIR)/Artifacts.toml | extract-$1
-	-GEN_SRC="$$(BUILDDIR)/$$($2_SRC_DIR)/src/$(1).jl"; \
+$$($(1)_SRC_DIR)/Artifacts.toml: | extract-$(1)
+
+$$($(1)_SRC_DIR)/jll-rewritten: $$($(1)_SRC_DIR)/Artifacts.toml
+	@GEN_SRC="$$($(1)_SRC_DIR)/src/$(1).jl"; \
 	ARTIFACT_INFO="$$$$($(PYTHON) $(JULIAHOME)/contrib/extract_artifact_info.py "$$<" $(BB_TRIPLET_LIBGFORTRAN_CXXABI))"; \
 	TREEHASH="$$$$(echo $$$${ARTIFACT_INFO} | cut -d ' ' -f1)"; \
 	TRIPLET="$$$$(echo $$$${ARTIFACT_INFO} | cut -d ' ' -f3)"; \
-	WRAPPER="$$(BUILDDIR)/$$($2_SRC_DIR)/src/wrappers/$$$${TRIPLET}.jl"; \
+	WRAPPER="$$($(1)_SRC_DIR)/src/wrappers/$$$${TRIPLET}.jl"; \
 	REL_PATH="joinpath(dirname(dirname(Sys.STDLIB)), \\\"artifacts\\\", \\\"$$$$TREEHASH\\\")"; \
 	echo "module $(1)" > "$$$${GEN_SRC}"; \
 	echo "using Libdl" >> "$$$${GEN_SRC}"; \
 	echo "const PATH_list = String[]; const LIBPATH_list = String[];" >> "$$$${GEN_SRC}"; \
 	sed -e "s/artifact\\\"$(subst _jll,,$(1))\\\"/$$$${REL_PATH}/" <"$$$${WRAPPER}" >>"$$$${GEN_SRC}"; \
-	echo "end" >> "$$$${GEN_SRC}"
+	echo "end # module $(1)" >> "$$$${GEN_SRC}"
 	touch $$@
 
 # Add rewrite rule to list of things necessary to satisfy `install-$1`
-install-$1: $$(BUILDDIR)/$$($2_SRC_DIR)/jll-rewritten
+install-$$($(1)_TARGET_NAME): $$($(1)_SRC_DIR)/jll-rewritten
 endef

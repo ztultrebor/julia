@@ -3,7 +3,6 @@
 module UMFPACK
 using SuiteSparse_jll
 # Ensure that SuiteSparse_jll is initialized properly
-SuiteSparse_jll.METIS_jll.__init__()
 SuiteSparse_jll.OpenBLAS_jll.__init__()
 SuiteSparse_jll.__init__()
 

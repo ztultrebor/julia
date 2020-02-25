@@ -28,12 +28,6 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
-[[METIS_jll]]
-deps = ["Libdl", "Pkg"]
-git-tree-sha1 = "1016c455c8f9b9ae871b4736b6e6596c6efe3dfd"
-uuid = "d00139f3-1899-568f-a2f0-47f597d42d70"
-version = "5.1.0+1"
-
 [[Markdown]]
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
@@ -74,7 +68,7 @@ deps = ["LinearAlgebra", "Random"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [[SuiteSparse_jll]]
-deps = ["Libdl", "METIS_jll", "OpenBLAS_jll", "Pkg"]
+deps = ["Libdl", "OpenBLAS_jll", "Pkg"]
 git-tree-sha1 = "c1ff471d18ef69520bc4d064997e205c4e410bc4"
 uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
 version = "5.4.0+4"

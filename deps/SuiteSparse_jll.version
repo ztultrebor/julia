@@ -1,4 +1,4 @@
 SUITESPARSE_JLL_BRANCH = master
-SUITESPARSE_JLL_SHA1 = bf6c95b2df0fbc46be51a511b6b916e6162e7b48
+SUITESPARSE_JLL_SHA1 = f34f1d5eb1d7dbf3de0470b5b4b34501b3ba0e8d
 SUITESPARSE_JLL_GIT_URL := git://github.com/JuliaBinaryWrappers/SuiteSparse_jll.jl.git
 SUITESPARSE_JLL_TAR_URL = https://api.github.com/repos/JuliaBinaryWrappers/SuiteSparse_jll.jl/tarball/$1

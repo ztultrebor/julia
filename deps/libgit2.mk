@@ -93,17 +93,25 @@ configure-libgit2: $(BUILDDIR)/$(LIBGIT2_SRC_DIR)/build-configured
 compile-libgit2: $(BUILDDIR)/$(LIBGIT2_SRC_DIR)/build-compiled
 fastcheck-libgit2: #none
 check-libgit2: $(BUILDDIR)/$(LIBGIT2_SRC_DIR)/build-checked
-$(build_prefix)/manifest/libgit2: $(build_datarootdir)/julia/cert.pem # use libgit2 install status
+
+# If we built our own libgit2, we need to generate a fake LibGit2_jll package to load it in:
+$(eval $(call jll-generate,LibGit2_jll,libgit2=libgit2,e37daf67-58a4-590a-8e99-b0245dd2ffc5,\
+		                   MbedTLS_jll=c8ffd9c3-330d-5841-b78e-0817d7145fa1 \
+						   LibSSH2_jll=29816b5a-b9ab-546f-933c-edad1886dfa8 \
+						   LibCURL_jll=deac9b47-8bc7-5906-a0fe-35ac56dc84c0))
 
 else # USE_BINARYBUILDER_LIBGIT2
 
-#LIBGIT2_BB_URL_BASE := https://github.com/JuliaBinaryWrappers/LibGit2_jll.jl/releases/download/LibGit2-v$(LIBGIT2_VER)+$(LIBGIT2_BB_REL)
-#LIBGIT2_BB_NAME := LibGit2.v$(LIBGIT2_VER)
-#$(eval $(call bb-install,libgit2,false))
-$(eval $(call artifact-install,LibGit2_jll,LIBGIT2_JLL))
+# Install LibGit2_jll into our stdlib folder
+$(eval $(call stdlib-external,LibGit2_jll,LIBGIT2_JLL))
+install-libgit2: install-LibGit2_jll
 
-# BB tarball doesn't create a manifest, so directly depend the `install` target
-install-libgit2: $(build_datarootdir)/julia/cert.pem
+# Rewrite LibGit2_jll/src/*.jl to avoid dependencies on Pkg
+$(eval $(call jll-rewrite,LibGit2_jll))
+
+# Install artifacts from LibGit2_jll into artifacts folder
+$(eval $(call artifact-install,LibGit2_jll))
+
 endif
 
 # Also download and install a cacert.pem file, regardless of whether or not
@@ -118,4 +126,4 @@ $(build_datarootdir)/julia/cert.pem: $(SRCCACHE)/cacert-$(MOZILLA_CACERT_VERSION
 
 # When "get"'ing libgit2, download the .pem
 get-libgit2: $(SRCCACHE)/cacert-$(MOZILLA_CACERT_VERSION).pem
-
+$(build_prefix)/manifest/libgit2: $(build_datarootdir)/julia/cert.pem

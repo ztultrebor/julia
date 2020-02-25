@@ -59,10 +59,10 @@ endif
 julia-stdlib: | $(DIRS)
 	@$(MAKE) $(QUIET_MAKE) -C $(BUILDROOT)/stdlib
 
-julia-deps: | $(DIRS) $(build_datarootdir)/julia/base $(build_datarootdir)/julia/test julia-stdlib
+julia-deps: | $(DIRS) $(build_datarootdir)/julia/base $(build_datarootdir)/julia/test
 	@$(MAKE) $(QUIET_MAKE) -C $(BUILDROOT)/deps
 
-julia-base: julia-deps $(build_sysconfdir)/julia/startup.jl $(build_man1dir)/julia.1 $(build_datarootdir)/julia/julia-config.jl | julia-stdlib
+julia-base: julia-deps $(build_sysconfdir)/julia/startup.jl $(build_man1dir)/julia.1 $(build_datarootdir)/julia/julia-config.jl
 	@$(MAKE) $(QUIET_MAKE) -C $(BUILDROOT)/base
 
 julia-libccalltest: julia-deps

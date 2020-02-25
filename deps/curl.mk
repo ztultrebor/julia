@@ -68,11 +68,29 @@ compile-curl: $(BUILDDIR)/curl-$(CURL_VER)/build-compiled
 fastcheck-curl: #none
 check-curl: $(BUILDDIR)/curl-$(CURL_VER)/build-checked
 
+# If we built our own libcurl, we need to generate a fake LibCURL_jll package to load it in:
+$(eval $(call jll-generate,LibCURL_jll,libcurl=libcurl,deac9b47-8bc7-5906-a0fe-35ac56dc84c0,
+                           LibSSH2_jll=29816b5a-b9ab-546f-933c-edad1886dfa8 \
+						   MbedTLS_jll=c8ffd9c3-330d-5841-b78e-0817d7145fa1 \
+						   Zlib_jll=83775a58-1f1d-513f-b197-d71354ab007a))
+
 else # USE_BINARYBUILDER_CURL
 
-#CURL_BB_URL_BASE := https://github.com/JuliaBinaryWrappers/LibCURL_jll.jl/releases/download/LibCURL-v$(CURL_VER)+$(CURL_BB_REL)
-#CURL_BB_NAME := LibCURL.v$(CURL_VER)
+# Install LibCURL_jll into our stdlib folder
+$(eval $(call stdlib-external,LibCURL_jll,LIBCURL_JLL))
+install-curl: install-LibCURL_jll
 
-#$(eval $(call bb-install,curl,false))
-$(eval $(call artifact-install,LibCURL_jll,LIBCURL_JLL,curl))
+# Rewrite LibCURL_jll/src/*.jl to avoid dependencies on Pkg
+$(eval $(call jll-rewrite,LibCURL_jll))
+
+# Install artifacts from LibCURL_jll into artifacts folder
+$(eval $(call artifact-install,LibCURL_jll))
+
+# Fix naming mismatch (libcurl vs. curl)
+$(build_prefix)/manifest/curl: $(build_prefix)/manifest/libcurl
+	cp "$<" "$@"
+install-curl: install-libcurl $(build_prefix)/manifest/curl
+UNINSTALL_curl = $(UNINSTALL_libcurl)
+uninstall-curl: uninstall-libcurl
+
 endif

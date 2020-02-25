@@ -15,6 +15,9 @@ include $(SRCDIR)/tools/common.mk
 include $(SRCDIR)/tools/git-external.mk
 include $(SRCDIR)/tools/bb-install.mk
 include $(SRCDIR)/tools/artifact-install.mk
+include $(SRCDIR)/tools/jll-generate.mk
+include $(SRCDIR)/tools/jll-rewrite.mk
+include $(SRCDIR)/tools/stdlib-external.mk
 
 BUILDDIR := $(BUILDDIR)$(MAYBE_HOST)
 
@@ -160,7 +163,8 @@ ifneq ($(OS), WINNT)
 DEP_LIBS += libwhich
 endif
 
-DEP_LIBS_STAGED := $(filter-out suitesparse-wrapper osxunwind BLAS_jll,$(DEP_LIBS)) # unlist targets that have not been converted to use the staged-install
+# unlist targets that have not been converted to use the staged-install, as well as JLL packages
+DEP_LIBS_STAGED := $(filter-out suitesparse-wrapper osxunwind,$(patsubst %_jll,,$(DEP_LIBS)))
 
 ## Our JLLs require julia stdlibs to be installed, so we create this target to ensure that they exist properly
 julia-stdlib:
