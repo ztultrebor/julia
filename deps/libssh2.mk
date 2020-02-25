@@ -29,10 +29,12 @@ ifeq ($(LIBSSH2_ENABLE_TESTS), 0)
 LIBSSH2_OPTS += -DBUILD_TESTING=OFF
 endif
 
+LIBSSH2_DEP_LIBS += -L"$(MBEDTLS_LIB_DIR)"
+
 $(BUILDDIR)/$(LIBSSH2_SRC_DIR)/build-configured: $(SRCCACHE)/$(LIBSSH2_SRC_DIR)/source-extracted
 	mkdir -p $(dir $@)
 	cd $(dir $@) && \
-	$(CMAKE) $(dir $<) $(LIBSSH2_OPTS)
+	LDFLAGS="$(LIBSSH2_DEP_LIBS)" $(CMAKE) $(dir $<) $(LIBSSH2_OPTS)
 	echo 1 > $@
 
 $(BUILDDIR)/$(LIBSSH2_SRC_DIR)/build-compiled: $(BUILDDIR)/$(LIBSSH2_SRC_DIR)/build-configured

@@ -89,6 +89,11 @@ $(eval $(call artifact-install,LibCURL_jll))
 # Fix naming mismatch (libcurl vs. curl)
 $(build_prefix)/manifest/curl: $(build_prefix)/manifest/libcurl
 	cp "$<" "$@"
+clean-curl: clean-libcurl
+distclean-curl: distclean-libcurl
+get-curl: get-libcurl
+extract-curl: extract-libcurl
+compile-curl: compile-libcurl
 install-curl: install-libcurl $(build_prefix)/manifest/curl
 UNINSTALL_curl = $(UNINSTALL_libcurl)
 uninstall-curl: uninstall-libcurl

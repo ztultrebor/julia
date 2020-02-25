@@ -4,13 +4,12 @@ SRCDIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 JULIAHOME := $(abspath $(SRCDIR)/..)
 SRCCACHE := $(abspath $(SRCDIR)/srccache)
 BUILDDIR := .
+VERSDIR := v$(shell cut -d. -f1-2 < $(JULIAHOME)/VERSION)
 
 include $(JULIAHOME)/Make.inc
 include $(JULIAHOME)/deps/tools/common.mk
 include $(JULIAHOME)/deps/tools/stdlib-external.mk
 include $(JULIAHOME)/deps/tools/jll-rewrite.mk
-
-VERSDIR := v$(shell cut -d. -f1-2 < $(JULIAHOME)/VERSION)
 
 # stdlibs that are vendored in-tree
 STDLIBS = Base64 CRC32c Dates DelimitedFiles Distributed FileWatching \
@@ -33,7 +32,7 @@ STDLIBS_LINK_TARGETS := $(addprefix $(build_datarootdir)/julia/stdlib/$(VERSDIR)
 DIRS += $(build_datarootdir)/julia/stdlib/$(VERSDIR)
 
 getall get: $(addprefix get-, $(STDLIBS_EXT))
-install: $(addprefix install-, $(STDLIBS_EXT)) $(STDLIBS_LINK_TARGETS) $(DIRS)
+install: $(addprefix install-, $(STDLIBS_EXT)) $(STDLIBS_LINK_TARGETS)
 clean: $(addprefix clean-, $(STDLIBS_EXT)) $(CLEAN_TARGETS)
 distclean: $(addprefix distclean-, $(STDLIBS_EXT)) clean
 

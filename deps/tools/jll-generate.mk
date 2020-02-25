@@ -22,36 +22,49 @@ $$($(1)_SRC_DIR):
 # Generate boilerplate `dlopen()` pasta
 $$($(1)_SRC_DIR)/src/$(1).jl: | $$($(1)_SRC_DIR)
 	@mkdir -p "$$(dir $$@)"
-	@echo "module $(1)" > "$$@"
+	@echo "module $(strip $(1))" > "$$@"
 	@echo "using Libdl" >> "$$@"
+	@echo "const PATH_list = String[]; const LIBPATH_list = String[]" >> "$$@"
+	@# Generate `using $dep` for each dependency
+	@for deppair in $(4); do \
+		name=$$$$(echo $$$${deppair} | cut -d'=' -f1); \
+		echo "using $$$${name}" >> "$$@"; \
+	done
 
+	@# Generate placeholder global variables for all libraries we're going to export
 	@for libpair in $(2); do \
 		varname=$$$$(echo $$$${libpair} | cut -d'=' -f1); \
 		fname=$$$$(echo $$$${libpair} | cut -d'=' -f2); \
+		echo "export $$$${varname}" >> "$$@"; \
 		echo "const $$$${varname} = \"$$$${fname}\"" >> "$$@"; \
 		echo "$$$${varname}_handle = C_NULL" >> "$$@"; \
-		echo "$$$${varname}_SRC_DIR = \"\"" >> "$$@"; \
+		echo "$$$${varname}_path = \"\"" >> "$$@"; \
 		echo >> "$$@"; \
 	done
 	
+	@# Generate an `__init__()` that just blithely calls `dlopen(SONAME)` for each library.
+	@# This only works if the library is locatable on the current RPATH of the executable,
+	@# and all dependencies are as well or have already been dlopen'ed, which, if we're
+	@# generating a fake JLL, we know to be true.
 	@echo "function __init__()" >> "$$@"
 	@for libpair in $(2); do \
 		varname=$$$$(echo $$$${libpair} | cut -d'=' -f1); \
-		echo "    global $$$${varname}" >> "$$@"; \
+		echo "    global $$$${varname}_handle, $$$${varname}_path" >> "$$@"; \
 		echo "    $$$${varname}_handle = dlopen($$$${varname})" >> "$$@"; \
-		echo "    $$$${varname}_SRC_DIR = dlpath($$$${varname})" >> "$$@"; \
+		echo "    $$$${varname}_path = dlpath($$$${varname})" >> "$$@"; \
 	done
 	@echo "end # function __init__()" >> "$$@"
 	@echo "end # module $(1)" >> "$$@"
 
 # Generate an appropriate Project.toml
 $$($(1)_SRC_DIR)/Project.toml: | $$($(1)_SRC_DIR)
-	@echo "name = \"$(1)\"" > "$$@"
-	@echo "uuid = \"$(3)\"" >> "$$@"
+	@echo "name = \"$(strip $(1))\"" > "$$@"
+	@echo "uuid = \"$(strip $(3))\"" >> "$$@"
 	@echo "version = \"1.0.0\"" >> "$$@"
 	
 	@echo "[deps]" >> "$$@"
 	@echo "Libdl = \"8f399da3-3557-5675-b5ff-fb832c97cbdb\"" >> "$$@"
+	@# Generate dependency mappings for all deps
 	@for deppair in $(4); do \
 		name=$$$$(echo $$$${deppair} | cut -d'=' -f1); \
 		uuid=$$$$(echo $$$${deppair} | cut -d'=' -f2); \
@@ -72,6 +85,9 @@ clean-$(1):
 	rm -rf $(build_datarootdir)/julia/stdlib/$(VERSDIR)/$(1)
 	rm -f $(build_prefix)/manifest/$(1)
 distclean-$(1): clean-$(1)
+
+# Generate helpful MBEDTLS_LIBDIR variable to point to julia's libdir
+$$(call uppercase,$$($(1)_TARGET_NAME))_LIBDIR := $(build_libdir)
 
 # Make install-mbedtls rely on install-MbedTLS_jll
 install-$$($(1)_TARGET_NAME): install-$(1)

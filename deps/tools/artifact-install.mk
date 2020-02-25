@@ -50,7 +50,9 @@ get-artifact-$(1): $$($(1)_SRC_DIR)/artifact-downloaded
 
 # `install-openblas` relies on `manifest/openblas`, which relies on `extract-artifact-OpenBLAS_jll`
 install-$$($(1)_TARGET_NAME): $$(build_prefix)/manifest/$$($(1)_TARGET_NAME)
-.PHONY: install-$$($(1)_TARGET_NAME)
+clean-$$($(1)_TARGET_NAME): uninstall-$(strip $1)
+distclean-$$($(1)_TARGET_NAME): uninstall-$(strip $1)
+.PHONY: install-$$($(1)_TARGET_NAME) clean-$$($(1)_TARGET_NAME) distclean-$$($(1)_TARGET_NAME)
 
 # Define libdir for this target, for people who want to link against us:
 # To match conventions, we define e.g. `OPENBLAS_LIBDIR`.  Note that this rule
@@ -60,7 +62,7 @@ install-$$($(1)_TARGET_NAME): $$(build_prefix)/manifest/$$($(1)_TARGET_NAME)
 # to download those files for us.  This means that every time someone tries
 # to use (e.g. `OPENBLAS_LIBDIR`), it will invoke a `python` process to parse
 # the toml file.  This isn't ideal, but it's not a dealbreaker either.
-$$(eval $$(call uppercase,$$($(1)_TARGET_NAME))_LIBDIR = $$$$(shell $$$$($(1)_GET_META_INFO) echo $$$$$$$${artifact_dir}))
+$$(eval $$(call uppercase,$$($(1)_TARGET_NAME))_LIBDIR = $$$$(shell $$$$($(1)_GET_META_INFO) echo $$$$$$$${artifact_dir}/lib*))
 endef
 
 # Uninstaller that determines the artifact directory of a JLL, then deletes it

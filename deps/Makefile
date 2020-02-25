@@ -166,11 +166,6 @@ endif
 # unlist targets that have not been converted to use the staged-install, as well as JLL packages
 DEP_LIBS_STAGED := $(filter-out suitesparse-wrapper osxunwind,$(patsubst %_jll,,$(DEP_LIBS)))
 
-## Our JLLs require julia stdlibs to be installed, so we create this target to ensure that they exist properly
-julia-stdlib:
-	@$(MAKE) $(QUIET_MAKE) -C $(BUILDROOT)/stdlib
-.PHONY: julia-stdlib
-
 ## Common build target prefixes
 
 default: | $(build_prefix)

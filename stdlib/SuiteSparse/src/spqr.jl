@@ -1,6 +1,7 @@
 # This file is a part of Julia. License is MIT: https://julialang.org/license
 
 module SPQR
+using SuiteSparse_jll
 
 import Base: \
 using Base: require_one_based_indexing
