@@ -332,11 +332,39 @@ void JuliaOJIT::DebugObjectRegistrar::operator()(RTDyldObjHandleT H,
                    static_cast<const RuntimeDyld::LoadedObjectInfo*>(&LOS));
 }
 
+jl_code_instance_t *jl_get_code_in_flight(StringRef name);
 
 CompilerResultT JuliaOJIT::CompilerT::operator()(Module &M)
 {
     JL_TIMING(LLVM_OPT);
-    jit.PM.run(M);
+    int optlevel = -1;
+    jl_method_t *meth = NULL;
+    jl_method_instance_t *mi = NULL;
+    for (Module::iterator fs = M.begin(); fs != M.end(); ) {
+        Function &F = *fs;
+        if (!F.getBasicBlockList().empty()) {
+            jl_code_instance_t *codeinst = jl_get_code_in_flight(F.getName());
+            if (codeinst) {
+                mi = codeinst->def;
+                if (jl_is_method(mi->def.value)) {
+                    meth = mi->def.method;
+                    if (meth->module->optlevel == 0) {
+                        optlevel = 0;
+                        break;
+                    }
+                }
+                else {
+                    mi = NULL;
+                }
+            }
+        }
+        ++fs;
+    }
+    if (optlevel == -1)
+        jit.PM.run(M);
+    else
+        jit.fastPM.run(M);
+
     std::unique_ptr<MemoryBuffer> ObjBuffer(
         new SmallVectorMemoryBuffer(std::move(jit.ObjBufferSV)));
     auto Obj = object::ObjectFile::createObjectFile(ObjBuffer->getMemBufferRef());
@@ -389,6 +417,11 @@ JuliaOJIT::JuliaOJIT(TargetMachine &TM)
     addTargetPasses(&PM, &TM);
     addOptimizationPasses(&PM, jl_generating_output() ? 0 : jl_options.opt_level);
     if (TM.addPassesToEmitMC(PM, Ctx, ObjStream))
+        llvm_unreachable("Target does not support MC emission.");
+
+    addTargetPasses(&fastPM, &TM);
+    addOptimizationPasses(&fastPM, 0);
+    if (TM.addPassesToEmitMC(fastPM, Ctx, ObjStream))
         llvm_unreachable("Target does not support MC emission.");
 
     // Make sure SectionMemoryManager::getSymbolAddressInProcess can resolve

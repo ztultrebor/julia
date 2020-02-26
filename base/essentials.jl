@@ -106,6 +106,10 @@ macro specialize(vars...)
     return Expr(:meta, :specialize, vars...)
 end
 
+macro optlevel(n::Int)
+    return Expr(:meta, :optlevel, n)
+end
+
 macro _pure_meta()
     return Expr(:meta, :pure)
 end
