@@ -897,6 +897,7 @@ end
     z
 end
 @inline function ^(x::Float64, y::Integer)
+    y == -1 && return inv(x)
     y == 0 && return one(x)
     y == 1 && return x
     y == 2 && return x*x
@@ -904,6 +905,7 @@ end
     ccall("llvm.pow.f64", llvmcall, Float64, (Float64, Float64), x, Float64(y))
 end
 @inline function ^(x::Float32, y::Integer)
+    y == -1 && return inv(x)
     y == 0 && return one(x)
     y == 1 && return x
     y == 2 && return x*x
