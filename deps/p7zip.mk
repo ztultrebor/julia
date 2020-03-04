@@ -33,8 +33,8 @@ $(BUILDDIR)/p7zip-$(P7ZIP_VER)/build-compiled: $(BUILDDIR)/p7zip-$(P7ZIP_VER)/bu
 	echo 1 > $@
 
 define P7ZIP_INSTALL
-	mkdir -p $2/$$(build_bindir)
-	cp -a $1/bin/7za $2/$$(build_bindir)/7z
+	mkdir -p $2/$$(build_libexecdir)
+	cp -a $1/bin/7za $2/$$(build_libexecdir)/7z
 endef
 $(eval $(call staged-install, \
 	p7zip,p7zip-$(P7ZIP_VER), \

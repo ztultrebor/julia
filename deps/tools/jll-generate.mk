@@ -52,7 +52,7 @@ $$($(1)_SRC_DIR)/src/$(1).jl: | $$($(1)_SRC_DIR)
 		fname=$$$$(echo $$$${exepair} | cut -d'=' -f2); \
 		echo "export $$$${varname}" >> "$$@"; \
 		echo "function $$$${varname}(f::Function; adjust_PATH::Bool = true, adjust_LIBPATH::Bool = true)" >> "$$@"; \
-		echo "    f(joinpath(Base.BINDIR, Base.LIBEXECDIR, $$$${fname}))" >> "$$@"; \
+		echo "    f(joinpath(Sys.BINDIR, Base.LIBEXECDIR, $$$${fname}))" >> "$$@"; \
 		echo "end" >> "$$@"; \
 		echo >> "$$@"; \
 	done
