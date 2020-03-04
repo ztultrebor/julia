@@ -165,6 +165,27 @@ include("strings/substring.jl")
 include(string((length(Core.ARGS)>=2 ? Core.ARGS[2] : ""), "build_h.jl"))     # include($BUILDROOT/base/build_h.jl)
 include(string((length(Core.ARGS)>=2 ? Core.ARGS[2] : ""), "version_git.jl")) # include($BUILDROOT/base/version_git.jl)
 
+# Initialize DL_LOAD_PATH as early as possible.  We are defining things here in
+# a slightly more verbose fashion than usual, because we're running so early.
+const DL_LOAD_PATH = String[]
+let os = ccall(:jl_get_UNAME, Any, ()),
+    pathsep = (os == :Windows || os == :NT) ? "\\" : "/",
+    BINDIR = ccall(:jl_get_julia_bindir, String, ())
+
+    if (os == :Darwin || os == :Apple)
+        if Base.DARWIN_FRAMEWORK
+            push!(DL_LOAD_PATH, "@loader_path/Frameworks")
+        else
+            push!(DL_LOAD_PATH, "@loader_path/julia")
+        end
+        push!(DL_LOAD_PATH, "@loader_path")
+    end
+
+    # Include some paths for JLL libraries that we need (like pcre) that are so early
+    # in our boot-up process that we can't use even rewritten JLL packages
+    push!(DL_LOAD_PATH, string(BINDIR, pathsep, Base.PCRE_JLL_LIBDIR))
+end
+
 include("osutils.jl")
 include("c.jl")
 
@@ -203,15 +224,13 @@ include("version.jl")
 include("sysinfo.jl")
 include("libc.jl")
 using .Libc: getpid, gethostname, time
-
-const DL_LOAD_PATH = String[]
-if Sys.isapple()
-    if Base.DARWIN_FRAMEWORK
-        push!(DL_LOAD_PATH, "@loader_path/Frameworks")
-    else
-        push!(DL_LOAD_PATH, "@loader_path/julia")
+macro include_stdlib_jll(name)
+    quote
+        Core.include($(esc(__module__)), relpath(
+            joinpath(Sys.STDLIB, $(esc(name)), "src", string($(esc(name)), ".jl")),
+            pwd(),
+        ))
     end
-    push!(DL_LOAD_PATH, "@loader_path")
 end
 
 include("env.jl")
@@ -244,7 +263,9 @@ include("process.jl")
 include("grisu/grisu.jl")
 include("secretbuffer.jl")
 
-# core math functions
+# core math functions.  They occasionally need to ccall() out to Libm
+@include_stdlib_jll("Libm_jll")
+using .Libm_jll
 include("floatfuncs.jl")
 include("math.jl")
 using .Math

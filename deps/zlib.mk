@@ -29,18 +29,10 @@ fastcheck-zlib: check-zlib
 check-zlib: compile-zlib
 
 # If we built our own zlib, we need to generate a fake Zlib_jll package to load it in:
-$(eval $(call jll-generate,Zlib_jll,zlib=libz,83775a58-1f1d-513f-b197-d71354ab007a,))
+$(eval $(call jll-generate,Zlib_jll,zlib=\"libz\",,83775a58-1f1d-513f-b197-d71354ab007a,))
 
 else # USE_BINARYBUILDER_ZLIB
 
 # Install Zlib_jll into our stdlib folder
-$(eval $(call stdlib-external,Zlib_jll,ZLIB_JLL))
-install-zlib: install-Zlib_jll
-
-# Rewrite Zlib_jll/src/*.jl to avoid dependencies on Pkg
-$(eval $(call jll-rewrite,Zlib_jll))
-
-# Install artifacts from Zlib_jll into artifacts folder
-$(eval $(call artifact-install,Zlib_jll))
-
+$(eval $(call install-jll-and-artifact,Zlib_jll))
 endif # USE_BINARYBUILDER_ZLIB

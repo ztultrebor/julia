@@ -35,11 +35,13 @@ $$($(1)_SRC_DIR)/jll-rewritten: $$($(1)_SRC_DIR)/Artifacts.toml
 	TREEHASH="$$$$(echo $$$${ARTIFACT_INFO} | cut -d ' ' -f1)"; \
 	TRIPLET="$$$$(echo $$$${ARTIFACT_INFO} | cut -d ' ' -f3)"; \
 	WRAPPER="$$($(1)_SRC_DIR)/src/wrappers/$$$${TRIPLET}.jl"; \
-	REL_PATH="joinpath(dirname(dirname(Sys.STDLIB)), \\\"artifacts\\\", \\\"$$$$TREEHASH\\\")"; \
+	REL_PATH="joinpath(dirname(dirname(STDLIB)), \\\"artifacts\\\", \\\"$$$$TREEHASH\\\")"; \
 	echo "module $(1)" > "$$$${GEN_SRC}"; \
-	echo "using Libdl" >> "$$$${GEN_SRC}"; \
+	echo "using Base.Libc.Libdl" >> "$$$${GEN_SRC}"; \
+	echo "using Base.Sys: STDLIB" >> "$$$${GEN_SRC}"; \
 	echo "const PATH_list = String[]; const LIBPATH_list = String[];" >> "$$$${GEN_SRC}"; \
-	sed -e "s/artifact\\\"$(subst _jll,,$(1))\\\"/$$$${REL_PATH}/" <"$$$${WRAPPER}" >>"$$$${GEN_SRC}"; \
+	sed -e "s/artifact\\\"$(subst _jll,,$(1))\\\"/$$$${REL_PATH}/" \
+	    -e "s/^using \(.*\)/Base.@include_stdlib_jll(\"\1\"); using .\1/" <"$$$${WRAPPER}" >>"$$$${GEN_SRC}"; \
 	echo "end # module $(1)" >> "$$$${GEN_SRC}"
 	touch $$@
 

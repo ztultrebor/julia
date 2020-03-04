@@ -17,7 +17,7 @@ JLDFLAGS += $(LDFLAGS)
 FLAGS := \
 	-D_GNU_SOURCE -I$(BUILDDIR) -I$(SRCDIR) \
 	-I$(SRCDIR)/flisp -I$(SRCDIR)/support \
-	-I$(LIBUV_INC) -I$(build_includedir) -DLIBRARY_EXPORTS \
+	-I$(LIBUV_INC) -I$(LIBUNWIND_INC) -I$(build_includedir) -DLIBRARY_EXPORTS \
 	-I$(JULIAHOME)/deps/valgrind
 ifneq ($(USEMSVC), 1)
 FLAGS += -Wall -Wno-strict-aliasing -fno-omit-frame-pointer -fvisibility=hidden -fno-common \
@@ -172,7 +172,7 @@ define public_header_target
 $$(build_includedir)/julia/$$(notdir $(1)): $(1) | $$(build_includedir)/julia
 	$$(INSTALL_F) $$^ $$(build_includedir)/julia/
 endef
-$(foreach HEADER,$(PUBLIC_HEADERS) $(LIBUV_INC)/uv.h,$(eval $(call public_header_target,$(HEADER))))
+$(foreach HEADER,$(PUBLIC_HEADERS) $(LIBUNWIND_INC)/libunwind.h $(LIBUV_INC)/uv.h,$(eval $(call public_header_target,$(HEADER))))
 
 $(eval $(call dir_target,$(build_includedir)/julia/uv))
 $(build_includedir)/julia/uv/*.h: $(LIBUV_INC)/uv/*.h | $(build_includedir)/julia/uv

@@ -3,7 +3,6 @@ default: install
 SRCDIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 SRCCACHE := $(abspath $(SRCDIR)/srccache)
 JULIAHOME := $(abspath $(SRCDIR)/..)
-VERSDIR := v$(shell cut -d. -f1-2 < $(JULIAHOME)/VERSION)
 ifeq ($(abspath .),$(abspath $(SRCDIR)))
 BUILDDIR := scratch
 else
@@ -157,7 +156,9 @@ ifeq ($(USE_SYSTEM_LAPACK), 0)
 DEP_LIBS += lapack
 endif
 endif
-DEP_LIBS += BLAS_jll
+
+# Add our fake muxing JLL packages
+DEP_LIBS += BLAS_jll Libm_jll
 
 ifneq ($(OS), WINNT)
 DEP_LIBS += libwhich
@@ -186,6 +187,7 @@ include $(SRCDIR)/llvm.mk
 include $(SRCDIR)/libuv.mk
 include $(SRCDIR)/pcre.mk
 include $(SRCDIR)/openlibm.mk
+include $(SRCDIR)/libm_jll.mk
 include $(SRCDIR)/dsfmt.mk
 include $(SRCDIR)/objconv.mk
 include $(SRCDIR)/blas.mk

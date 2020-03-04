@@ -72,6 +72,7 @@ JL_DLLEXPORT void JL_NORETURN jl_errorf(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
+    jl_vprintf(JL_STDERR, fmt, args);
     jl_value_t *e = jl_vexceptionf(jl_errorexception_type, fmt, args);
     va_end(args);
     jl_throw(e);
@@ -127,6 +128,7 @@ JL_DLLEXPORT void JL_NORETURN jl_type_error(const char *fname, jl_value_t *expec
 
 JL_DLLEXPORT void JL_NORETURN jl_undefined_var_error(jl_sym_t *var)
 {
+    jl_errorf("undefined_var_error: \"%s\"\n", jl_symbol_name(var));
     jl_throw(jl_new_struct(jl_undefvarerror_type, var));
 }
 

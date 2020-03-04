@@ -1,8 +1,6 @@
 JULIAHOME := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 include $(JULIAHOME)/Make.inc
 
-VERSDIR := v`cut -d. -f1-2 < $(JULIAHOME)/VERSION`
-
 default: $(JULIA_BUILD_MODE) # contains either "debug" or "release"
 all: debug release
 

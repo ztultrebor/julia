@@ -27,7 +27,7 @@ $(1)_GET_META_INFO := \
 	treehash="$$$$(echo $$$${artifact_info} | cut -d' ' -f1)"; \
 	url="$$$$(echo $$$${artifact_info} | cut -d' ' -f2)"; \
 	artifact_dir="$(build_datarootdir)/julia/artifacts/$$$${treehash}"; \
-	src_tarball="$(SRCCACHE)/$(1)-artifact-$$$${treehash}.tar.gz";
+	src_tarball="$(SRCCACHE)/$(1)-$(BB_TRIPLET_LIBGFORTRAN_CXXABI)-$$$${treehash}.tar.gz";
 
 # How to download the artifacts tarball
 $$($(1)_SRC_DIR)/artifact-downloaded: $$($(1)_ARTIFACTS_TOML)
@@ -36,7 +36,6 @@ $$($(1)_SRC_DIR)/artifact-downloaded: $$($(1)_ARTIFACTS_TOML)
 	touch "$$@"
 
 # Generate a manifest for this jll-unpacked artifact, calling it just `openblas`
-# but having it depend on `extract-artifact-OpenBLAS_jll`.
 UNINSTALL_$$($(1)_TARGET_NAME) := $(1) artifact-uninstaller $$($(1)_ARTIFACT_DIR)
 $$(build_prefix)/manifest/$$($(1)_TARGET_NAME): $$($(1)_SRC_DIR)/artifact-downloaded | $$(build_prefix)/manifest
 	@$$($(1)_GET_META_INFO) \
@@ -47,9 +46,11 @@ $$(build_prefix)/manifest/$$($(1)_TARGET_NAME): $$($(1)_SRC_DIR)/artifact-downlo
 	@echo '$$(UNINSTALL_$$($(1)_TARGET_NAME))' > "$$@"
 
 get-artifact-$(1): $$($(1)_SRC_DIR)/artifact-downloaded
-
-# `install-openblas` relies on `manifest/openblas`, which relies on `extract-artifact-OpenBLAS_jll`
-install-$$($(1)_TARGET_NAME): $$(build_prefix)/manifest/$$($(1)_TARGET_NAME)
+extract-$$($(1)_TARGET_NAME):
+configure-$$($(1)_TARGET_NAME): get-artifact-$(1)
+compile-$$($(1)_TARGET_NAME): configure-$$($(1)_TARGET_NAME)
+# `install-openblas` relies on `manifest/openblas`, which relies on the `artifact-downloaded` file.
+install-$$($(1)_TARGET_NAME): $$(build_prefix)/manifest/$$($(1)_TARGET_NAME) compile-$$($(1)_TARGET_NAME)
 clean-$$($(1)_TARGET_NAME): uninstall-$(strip $1)
 distclean-$$($(1)_TARGET_NAME): uninstall-$(strip $1)
 .PHONY: install-$$($(1)_TARGET_NAME) clean-$$($(1)_TARGET_NAME) distclean-$$($(1)_TARGET_NAME)
@@ -62,7 +63,8 @@ distclean-$$($(1)_TARGET_NAME): uninstall-$(strip $1)
 # to download those files for us.  This means that every time someone tries
 # to use (e.g. `OPENBLAS_LIBDIR`), it will invoke a `python` process to parse
 # the toml file.  This isn't ideal, but it's not a dealbreaker either.
-$$(eval $$(call uppercase,$$($(1)_TARGET_NAME))_LIBDIR = $$$$(shell $$$$($(1)_GET_META_INFO) echo $$$$$$$${artifact_dir}/lib*))
+$$(eval $$(call uppercase,$$($(1)_TARGET_NAME))_LIBDIR = $$$$(shell $$$$($(1)_GET_META_INFO) echo $$$$$$$${artifact_dir}/$(binlib)))
+$$(eval $$(call uppercase,$$($(1)_TARGET_NAME))_INCDIR = $$$$(dir $$$$($$(call uppercase,$$($(1)_TARGET_NAME))_LIBDIR))include)
 endef
 
 # Uninstaller that determines the artifact directory of a JLL, then deletes it
@@ -73,4 +75,39 @@ uninstall-$(strip $1):
 		-rm -rf "$$$${artifact_dir}" ;\
 	fi
 	-rm -f $$(build_prefix)/manifest/$(strip $1)
+endef
+
+# Convenience macro to do the triple "download JLL, rewrite it, install artifact" combo:
+# Parameters:
+#   $(1) - jll_name (e.g. "MbedTLS_jll")
+define install-jll-and-artifact
+# Install <jll_name> into our stdlib folder
+$(eval $(call stdlib-external,$(1),$(call uppercase,$(1))))
+install-$(call lowercase,$(firstword $(subst _, ,$(1)))): install-$(1)
+
+# Rewrite <jll_name>/src/<jll_name>.jl to avoid dependencies on Pkg
+$(eval $(call jll-rewrite,$(1)))
+
+# Install artifacts from <jll_name> into artifacts folder
+$(eval $(call artifact-install,$(1)))
+endef
+
+# Sometimes, the julia buildsystem calls something `curl` while the registry calls it `LibCURL_jll`.
+# Parameters:
+#    $(1) - makefile name (e.g. "curl")
+#    $(2) - JLL name (e.g. "LibCURL_jll")
+# we map from `-curl` suffixes to `-libcurl` suffixes through this fixup makefile macro:
+define fix-artifact-naming-mismatch
+$(2)_TARGET_NAME := $(firstword $(subst _, ,$(call lowercase,$(2))))
+# Fix naming mismatch (libcurl vs. curl)
+$(build_prefix)/manifest/$(1): $(build_prefix)/manifest/$$($(2)_TARGET_NAME)
+	-cp "$$<" "$$@"
+clean-$(1): clean-$$($(2)_TARGET_NAME)
+distclean-$(1): distclean-$$($(2)_TARGET_NAME)
+get-$(1): get-$$($(2)_TARGET_NAME)
+extract-$(1): extract-$$($(2)_TARGET_NAME)
+compile-$(1): compile-$$($(2)_TARGET_NAME)
+install-$(1): install-$$($(2)_TARGET_NAME) install-$(2) $(build_prefix)/manifest/$(1)
+UNINSTALL_$(1) = $$(UNINSTALL_$$($(2)_TARGET_NAME))
+uninstall-$(1): uninstall-$$($(2)_TARGET_NAME)
 endef

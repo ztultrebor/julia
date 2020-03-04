@@ -3,6 +3,8 @@ import toml, sys, os
 artifacts_toml = sys.argv[1]
 platform_triplet = sys.argv[2]
 
+sys.stderr.write("PARSING %s\n"%(artifacts_toml))
+
 # Get the artifact_name as `MbedTLS_jll-<hash>` -> `MbedTLS`
 artifact_name = os.path.basename(os.path.dirname(artifacts_toml)).split("_jll")[0]
 data = toml.load(artifacts_toml)

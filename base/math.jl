@@ -27,7 +27,7 @@ using .Base: sign_mask, exponent_mask, exponent_one,
 
 using Core.Intrinsics: sqrt_llvm
 
-using .Base: IEEEFloat
+using .Base: IEEEFloat, Libm_jll
 
 @noinline function throw_complex_domainerror(f::Symbol, x)
     throw(DomainError(x, string("$f will only return a complex result if called with a ",
@@ -308,8 +308,6 @@ Stacktrace:
 log(b::Number, x::Number) = log(promote(b,x)...)
 
 # type specific math functions
-
-const libm = Base.libm_name
 
 # functions with no domain error
 """

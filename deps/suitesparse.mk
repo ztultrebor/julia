@@ -139,33 +139,25 @@ install-suitesparse-wrapper: $(build_shlibdir)/libsuitesparse_wrapper.$(SHLIB_EX
 
 # If we built our own libsuitesparse, we need to generate a fake SuiteSparse_jll package to load it in:
 # SuiteSparse has quite a few LibrayProducts...
-$(eval $(call jll-generate,SuiteSparse_jll,libsuitesparseconfig=libsuitesparseconfig \
-                                           libsuitesparse_wrapper=libsuitesparse_wrapper \
-										   libccolamd=libccolamd \
-										   libbtf=libbtf \
-										   libcamd=libcamd \
-										   libcolamd=libcolamd \
-										   libamd=libamd \
-										   librbio=librbio \
-										   libcholmod=libcholmod \
-										   libumfpack=libumfpack \
-										   libklu=libklu \
-										   libspqr=libspqr, \
+$(eval $(call jll-generate,SuiteSparse_jll,libsuitesparseconfig=\"libsuitesparseconfig\" \
+                                           libsuitesparse_wrapper=\"libsuitesparse_wrapper\" \
+										   libccolamd=\"libccolamd\" \
+										   libbtf=\"libbtf\" \
+										   libcamd=\"libcamd\" \
+										   libcolamd=\"libcolamd\" \
+										   libamd=\"libamd\" \
+										   librbio=\"librbio\" \
+										   libcholmod=\"libcholmod\" \
+										   libumfpack=\"libumfpack\" \
+										   libklu=\"libklu\" \
+										   libspqr=\"libspqr\",, \
 						   bea87d4a-7f5b-5778-9afe-8cc45184846c, \
                            OpenBLAS_jll=4536629a-c528-5b80-bd46-f80d51c5b363))
 
 else # USE_BINARYBUILDER_SUITESPARSE
 
 # Install SuiteSparse_jll into our stdlib folder
-$(eval $(call stdlib-external,SuiteSparse_jll,SUITESPARSE_JLL))
-install-suitesparse: install-SuiteSparse_jll
-
-# Rewrite SuiteSparse_jll/src/*.jl to avoid dependencies on Pkg
-$(eval $(call jll-rewrite,SuiteSparse_jll))
-
-# Install artifacts from SuiteSparse_jll into artifacts folder
-$(eval $(call artifact-install,SuiteSparse_jll))
-
+$(eval $(call install-jll-and-artifact,SuiteSparse_jll))
 
 get-suitesparse-wrapper: get-suitesparse
 extract-suitesparse-wrapper: extract-suitesparse

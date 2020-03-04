@@ -126,6 +126,14 @@ $(error cowardly refusing to build from source directory with a shell-metacharac
     (got: $(value JULIAHOME)))
 endif
 
+# Literal values that are hard to use in Makefiles otherwise:
+define newline # a literal \n
+
+
+endef
+COMMA:=,
+SPACE:=$(eval) $(eval)
+
 # we include twice to pickup user definitions better
 # include from JULIAHOME first so that BUILDROOT can override
 MAYBE_HOST :=
@@ -167,6 +175,7 @@ JULIA_VERSION := $(shell cat $(JULIAHOME)/VERSION)
 JULIA_MAJOR_VERSION := $(shell echo $(JULIA_VERSION) | cut -d'-' -f 1 | cut -d'.' -f 1)
 JULIA_MINOR_VERSION := $(shell echo $(JULIA_VERSION) | cut -d'-' -f 1 | cut -d'.' -f 2)
 JULIA_PATCH_VERSION := $(shell echo $(JULIA_VERSION) | cut -d'-' -f 1 | cut -d'.' -f 3)
+VERSDIR := v$(JULIA_MAJOR_VERSION).$(JULIA_MINOR_VERSION)
 
 # libjulia's SONAME will follow the format libjulia.so.$(SOMAJOR). Before v1.0.0,
 # SOMAJOR will be a two-decimal value, e.g. libjulia.so.0.5, whereas at and beyond
@@ -579,8 +588,10 @@ endif
 # On Windows, we want shared library files to end up in $(build_bindir), instead of $(build_libdir)
 ifeq ($(OS),WINNT)
 build_shlibdir := $(build_bindir)
+binlib := bin
 else
 build_shlibdir := $(build_libdir)
+binlib := lib
 endif
 
 ifeq ($(OS), FreeBSD)
@@ -881,28 +892,6 @@ ifeq ($(ISX86),1)
 endif
 endif
 
-ifeq ($(OS),WINNT)
-LIBUNWIND:=
-else ifneq ($(DISABLE_LIBUNWIND), 0)
-LIBUNWIND:=
-else
-ifeq ($(USE_SYSTEM_LIBUNWIND), 1)
-ifneq ($(OS),Darwin)
-LIBUNWIND:=-lunwind-generic -lunwind
-# Only for linux since we want to use not yet released libunwind features
-JCFLAGS+=-DSYSTEM_LIBUNWIND
-JCPPFLAGS+=-DSYSTEM_LIBUNWIND
-endif
-else
-ifeq ($(OS),Darwin)
-LIBUNWIND:=$(build_libdir)/libosxunwind.a
-JCPPFLAGS+=-DLIBOSXUNWIND
-else
-LIBUNWIND:=$(build_libdir)/libunwind-generic.a $(build_libdir)/libunwind.a
-endif
-endif
-endif
-
 ifeq ($(origin LLVM_CONFIG), undefined)
 ifeq ($(USE_SYSTEM_LLVM), 1)
 LLVM_CONFIG := llvm-config$(EXE)
@@ -966,56 +955,37 @@ endif
 
 ifeq ($(USE_SYSTEM_BLAS), 1)
 ifeq ($(OS), Darwin)
-USE_BLAS64 := 0
-USE_SYSTEM_LAPACK := 0
-LIBBLAS := -L$(build_libdir) -lgfortblas
-LIBBLASNAME := libgfortblas
+  USE_BLAS64 := 0
+  USE_SYSTEM_LAPACK := 0
+  LIBBLAS := -lgfortblas
+  LIBBLASNAME := libgfortblas
 else
-LIBBLAS ?= -lblas
-LIBBLASNAME ?= libblas
-endif
-else
-LIBBLAS := -L$(build_shlibdir) -lopenblas
-LIBBLASNAME := libopenblas
-endif
+  LIBBLAS ?= -lblas
+  LIBBLASNAME ?= libblas
+endif # OS
 
-# OpenBLAS builds LAPACK as part of its build.
-# We only need to build LAPACK if we are not using OpenBLAS.
-ifeq ($(USE_SYSTEM_BLAS), 0)
-LIBLAPACK := $(LIBBLAS)
-LIBLAPACKNAME := $(LIBBLASNAME)
-else
 ifeq ($(USE_SYSTEM_LAPACK), 1)
-LIBLAPACK ?= -llapack
-LIBLAPACKNAME ?= liblapack
+  LIBLAPACK ?= -llapack
+  LIBLAPACKNAME ?= liblapack
 else
-LIBLAPACK := -L$(build_shlibdir) -llapack $(LIBBLAS)
-LIBLAPACKNAME := liblapack
-endif
-endif
+  LIBLAPACK :=  -llapack $(LIBBLAS)
+  LIBLAPACKNAME := liblapack
+endif # USE_SYSTEM_LAPACK
+else
+  LIBBLAS := -lopenblas
+  LIBBLASNAME := libopenblas
+  # OpenBLAS builds LAPACK as part of its build.
+  # We only need to build LAPACK if we are not using OpenBLAS.
+  LIBLAPACK := $(LIBBLAS)
+  LIBLAPACKNAME := $(LIBBLASNAME)
+endif # USE_SYSTEM_BLAS
 
 ifeq ($(USE_SYSTEM_LIBM), 1)
-LIBM := -lm
-LIBMNAME := libm
+  LIBM := -lm
+  LIBMNAME := libm
 else
-LIBM := -lopenlibm
-LIBMNAME := libopenlibm
-endif
-
-ifeq ($(USE_SYSTEM_LIBUV), 1)
-  LIBUV := $(LOCALBASE)/lib/libuv-julia.a
-  LIBUV_INC := $(LOCALBASE)/include
-else
-  LIBUV := $(build_libdir)/libuv.a
-  LIBUV_INC := $(build_includedir)
-endif
-
-ifeq ($(USE_SYSTEM_UTF8PROC), 1)
-  LIBUTF8PROC := -lutf8proc
-  UTF8PROC_INC := $(LOCALBASE)/include
-else
-  LIBUTF8PROC := $(build_libdir)/libutf8proc.a
-  UTF8PROC_INC := $(build_includedir)
+  LIBM := -lopenlibm
+  LIBMNAME := libopenlibm
 endif
 
 # We need python for things like BB triplet recognition.  We don't really care
@@ -1038,6 +1008,14 @@ endif
 # but only if contrib/normalize_triplet.py works for our requested triplet.
 ifeq ($(shell $(call invoke_python,$(JULIAHOME)/contrib/normalize_triplet.py) $(or $(XC_HOST),$(XC_HOST),$(BUILD_MACHINE)) >/dev/null 2>/dev/null; echo $$?),0)
 USE_BINARYBUILDER ?= 1
+
+# Auto-detect triplet once, create different versions that we use as defaults below for each BB install target
+BB_TRIPLET_LIBGFORTRAN_CXXABI := $(shell $(call invoke_python,$(JULIAHOME)/contrib/normalize_triplet.py) $(or $(XC_HOST),$(XC_HOST),$(BUILD_MACHINE)) "$(shell $(FC) --version | head -1)" "$(or $(shell echo '\#include <string>' | $(CXX) $(CXXFLAGS) -x c++ -dM -E - | grep _GLIBCXX_USE_CXX11_ABI | awk '{ print $$3 }' ),1)")
+
+# NABIL TODO: Get rid of these
+BB_TRIPLET_LIBGFORTRAN := $(subst $(SPACE),-,$(filter-out cxx%,$(subst -,$(SPACE),$(BB_TRIPLET_LIBGFORTRAN_CXXABI))))
+BB_TRIPLET_CXXABI := $(subst $(SPACE),-,$(filter-out libgfortran%,$(subst -,$(SPACE),$(BB_TRIPLET_LIBGFORTRAN_CXXABI))))
+BB_TRIPLET := $(subst $(SPACE),-,$(filter-out cxx%,$(filter-out libgfortran%,$(subst -,$(SPACE),$(BB_TRIPLET_LIBGFORTRAN_CXXABI)))))
 else
 ifneq ($(shell $(call invoke_python,$(JULIAHOME)/contrib/normalize_triplet.py) x86_64-linux-gnu),x86_64-linux-gnu)
 $(warning normalize_triplet.py appears to be non-functional (used python interpreter "$(PYTHON)"), so BinaryBuilder disabled)
@@ -1062,14 +1040,109 @@ endif
 endef
 $(foreach proj,$(BB_PROJECTS),$(eval $(call SET_BB_DEFAULT,$(proj))))
 
+# We default MKL to off, but if it's turned on, then disable OpenBLAS:
+USE_BINARYBUILDER_MKL ?= 0
+ifeq ($(USE_BINARYBUILDER_MKL),1)
+USE_BINARYBUILDER_OPENBLAS := 0
+endif
+
+# We default libosxunwind to just use whatever libunwind is set to
+USE_BINARYBUILDER_LIBOSXUNWIND ?= $(USE_BINARYBUILDER_LIBUNWIND)
+
+# Some helper functions for finding JLL packages.  Spinning up a python process to parse a
+# TOML file is expensive, and we must wait until the TOML files are on-disk before we can
+# parse them.  This means that we cannot use `:=` (since we do not want to evaluate these
+# rules now, we want to evaluate them when we use them, so we use `=`) however we also do
+# not want to re-evaluate them multiple times.  So we define a caching mechanism where the
+# rules are still lazily-evaluated, but 
+define hit_cache
+$(if $(_CACHE-$(1)),,$(eval _CACHE-$(1) := $($(1))))$(_CACHE-$(1))
+endef
+
+define artifact_treehash
+$(shell $(PYTHON) $(JULIAHOME)/contrib/extract_artifact_info.py $(build_datarootdir)/julia/stdlib/$(VERSDIR)/$(1)/Artifacts.toml $(BB_TRIPLET_LIBGFORTRAN_CXXABI) 2>/dev/null | cut -d' ' -f1)
+endef
+
+define find_jll
+$(build_datarootdir)/julia/artifacts/$(call artifact_treehash,$(1))
+endef
+
+define binrel_path
+$(shell $(JULIAHOME)/contrib/relative_path.sh "$(bindir)" "$(1)")
+endef
+
+ifeq ($(USE_SYSTEM_LIBUV), 1)
+  LIBUV = $(LOCALBASE)/lib/libuv-julia.a
+  LIBUV_INC = $(LOCALBASE)/include
+else
+ifeq ($(USE_BINARYBUILDER_LIBUV),1)
+  LIBUV_JLL_DIR = $(call find_jll,LibUV_jll)
+  LIBUV = $(call hit_cache,LIBUV_JLL_DIR)/lib/libuv.a
+  LIBUV_INC = $(call hit_cache,LIBUV_JLL_DIR)/include
+else
+  LIBUV = $(build_libdir)/libuv.a
+  LIBUV_INC = $(build_includedir)
+endif # USE_BINARYBUILDER_LIBUV
+endif # USE_SYSTEM_LIBUV
 
 
-# Use the Assertions build
+ifeq ($(USE_SYSTEM_UTF8PROC), 1)
+  LIBUTF8PROC = -lutf8proc
+  UTF8PROC_INC = $(LOCALBASE)/include
+else
+ifeq ($(USE_BINARYBUILDER_UTF8PROC),1)
+  LIBUUTF8PROC_JLL_DIR = $(call find_jll,utf8proc_jll)
+  LIBUTF8PROC = $(call hit_cache,LIBUUTF8PROC_JLL_DIR)/lib/libutf8proc.a
+  UTF8PROC_INC = $(call hit_cache,LIBUUTF8PROC_JLL_DIR)/include
+else
+  LIBUTF8PROC = $(build_libdir)/libutf8proc.a
+  UTF8PROC_INC = $(build_includedir)
+endif # USE_BINARYBUILDER_UTF8PROC
+endif # USE_SYSTEM_UTF8PROC
+
+ifeq ($(OS),WINNT)
+  # Windows does not use libunwind
+  LIBUNWIND:=
+else ifneq ($(DISABLE_LIBUNWIND), 0)
+  LIBUNWIND:=
+else
+ifeq ($(USE_SYSTEM_LIBUNWIND), 1)
+# If we're using system libunwind on Linux, we need to clue Julia in with -DSYSTEM_LIBUNWIND
+ifneq ($(OS),Darwin)
+  LIBUNWIND:=-lunwind-generic -lunwind
+  JCFLAGS+=-DSYSTEM_LIBUNWIND
+  JCPPFLAGS+=-DSYSTEM_LIBUNWIND
+endif # $(OS) != Darwin
+
+else
+# If we're using BB unwind, choose the JLL name here:
+ifeq ($(OS),Darwin)
+  LIBUNWIND_JLL_NAME = LibOSXUnwind_jll
+  JCPPFLAGS+=-DLIBOSXUNWIND
+else
+  LIBUNWIND_JLL_NAME = LibUnwind_jll
+endif # $(OS) == Darwin
+
+ifeq ($(USE_BINARYBUILDER_LIBUNWIND),1)
+  LIBUNWIND_JLL_DIR = $(call find_jll,$(LIBUNWIND_JLL_NAME))
+  LIBUNWIND = $(call hit_cache,LIBUNWIND_JLL_DIR)/lib/$(firstword $(subst _, ,$(call lowercase,$(LIBUNWIND_JLL_NAME)))).a
+  LIBUNWIND_INC = $(call hit_cache,LIBUNWIND_JLL_DIR)/include
+else
+ifeq ($(OS),Darwin)
+  LIBUNWIND = $(build_libdir)/libosxunwind.a
+  LIBUNWIND_INC = $(build_includedir)
+else
+  LIBUNWIND = $(build_libdir)/libunwind-generic.a $(build_libdir)/libunwind.a
+  LIBUNWIND_INC = $(build_includedir)
+endif # $(OS) == Darwin
+endif # $(USE_BINARYBUILDER_LIBUNWIND)
+endif # $(USE_SYSTEM_LIBUNWIND)
+endif # $(OS) == WINNT
+
+
+# Use the LLVM Assertions build
 BINARYBUILDER_LLVM_ASSERTS ?= 0
 
-
-
-# OS specific stuff
 
 # install_name_tool
 ifeq ($(OS), Darwin)
@@ -1089,6 +1162,16 @@ else
   INSTALL_NAME_CMD := true -ignore
   INSTALL_NAME_CHANGE_CMD := true -ignore
   DSYMUTIL := true -ignore
+endif
+
+# Define rpath_link_flag that adds an `-Wl,-rpath-link,$(1)` to linker invocations on non-Windows platforms
+ifneq (,$(filter $(OS),WINNT emscripten))
+define rpath_link_flag
+endef
+else
+define rpath_link_flag
+-Wl,-rpath-link,$(1)
+endef
 endif
 
 # shared library runtime paths
@@ -1420,10 +1503,6 @@ PRINT_JULIA = echo '$(subst ','\'',$(1))'; $(1)
 
 endif
 
-define newline # a literal \n
-
-
-endef
 
 # Makefile debugging trick:
 # call print-VARIABLE to see the runtime value of any variable
@@ -1431,6 +1510,3 @@ endef
 print-%:
 	@echo '$*=$(subst ','\'',$(subst $(newline),\n,$($*)))'
 
-# Literal values that are hard to use in Makefiles otherwise:
-COMMA:=,
-SPACE:=$(eval) $(eval)

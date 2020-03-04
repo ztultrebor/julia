@@ -157,8 +157,9 @@ else
 end
 
 # Include utilities that bring in our ability to load and call BLAS functions,
-# polymorphizing on USE_BLAS64.  Note that we always open 
-using BLAS_jll
+# polymorphizing on USE_BLAS64.
+Base.@include_stdlib_jll("BLAS_jll")
+using .BLAS_jll
 include("blaslib.jl")
 
 

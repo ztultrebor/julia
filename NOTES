@@ -1,15 +1,30 @@
-It appears that we have a tricky circular dependency.  LibGit2 depends on LibGit2_jll, which depends on Pkg, which depends on LibGit2 again.
-
-Because we only have one version of LibGit2 that we support, we can dump some of the version() checks.
-
 We appear to be searching `~/.julia/artifacts` first; this isn't the end of the world, but perhaps, for artifacts, we should reverse the order of depots?
 
-Can't do GMP and MPFR, as they are actually in Base, and I can't load JLLs at that point.  :(
+We are now installing things into `stdlib` from `deps`.  Not fatal, but troubling.
 
-If we hack around Pkg support in JLLs, we will bake certain platforms into the JLLs, so you won't be able to switch with something like PackageCompilerX.
+The inconsistency of __init__() methods is somewhat troubling.  It's not fatal, but it's troubling.  I'm working around this by eliminating dependency on compile-time dlopen()'ing whenever possible.
 
-Still need to PCRE_jll, LLVM_jll
+Still need to do LLVM and CSL
 
-One thing that kind of concerns me is that the buildsystem now really entangles Base and stdlib, since we are satisfying binary dependencies in Base (pcre, LLVM, GMP/MPFR) through binaries provided by the stdlib.  That doesn't feel very good to me.
 
-The inconsistency of __init__() methods is somewhat troubling.  It's not fatal, but it's troubling.
+Deps Dependency tree:
+
+* MPFR
+  - GMP
+* SuiteSparse
+  - OpenBLAS
+* LLVM
+* LibGit2
+  - curl
+    - Zlib
+    - LibSSH2
+      - MbedTLS
+* dSFMT
+* OpenLibm
+* LibUV
+* p7zip
+* PCRE
+* LibUnwind
+* utf8proc
+* Zlib
+
