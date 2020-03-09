@@ -162,11 +162,12 @@ macro test999_str(args...); args; end
 @test parseall(":(a = &\nb)") == Expr(:quote, Expr(:(=), :a, Expr(:&, :b)))
 @test parseall(":(a = \$\nb)") == Expr(:quote, Expr(:(=), :a, Expr(:$, :b)))
 
-# issue 11970
+# issue 12027 - short macro name parsing vs _str suffix
 @test parseall("""
     macro f(args...) end; @f "macro argument"
 """) == Expr(:toplevel,
-             Expr(:macro, Expr(:call, :f, Expr(:..., :args)), Expr(:block, LineNumberNode(1, :none))),
+             Expr(:macro, Expr(:call, :f, Expr(:..., :args)),
+                  Expr(:block, LineNumberNode(1, :none), LineNumberNode(1, :none))),
              Expr(:macrocall, Symbol("@f"), LineNumberNode(1, :none), "macro argument"))
 
 # blocks vs. tuples
@@ -744,11 +745,11 @@ f1_exprs = get_expr_list(f1_ci)
 f2_exprs = get_expr_list(f2_ci)
 
 if Base.JLOptions().can_inline != 0
-    @test length(f1_ci.linetable) == 3
-    @test length(f2_ci.linetable) >= 3
+    @test length(f1_ci.linetable) == 4
+    @test length(f2_ci.linetable) >= 4
 else
-    @test length(f1_ci.linetable) == 2
-    @test length(f2_ci.linetable) >= 3
+    @test length(f1_ci.linetable) == 3
+    @test length(f2_ci.linetable) >= 4
 end
 
 # Check that string and command literals are parsed to the appropriate macros
@@ -1423,6 +1424,7 @@ let ex = Meta.lower(@__MODULE__, Meta.parse("
     @test isa(ex, Expr) && ex.head === :error
     @test ex.args[1] == """
 invalid assignment location "function (s, o...)
+    # none, line 2
     # none, line 3
     f(a, b) do
         # none, line 4
