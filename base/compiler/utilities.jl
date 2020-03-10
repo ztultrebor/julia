@@ -83,6 +83,20 @@ end
 # MethodInstance/CodeInfo #
 ###########################
 
+function CodeInfo(stmts::Vector{Any}, codelocs::Vector{Int32}, ssavaluetypes::Vector{Any},
+                  ssaflags::Vector{UInt8}, src::CodeInfo)
+    return CodeInfo(stmts, codelocs, ssavaluetypes, ssaflags,
+                    src.method_for_inference_limit_heuristics,
+                    src.linetable, src.slotnames, src.slotflags, src.slottypes,
+                    src.rettype, src.parent, src.edges, src.min_world,
+                    src.max_world, src.inferred,
+                    src.inlineable, src.propagate_inbounds, src.pure)
+end
+function CodeInfo(stmts::Vector{Any}, codelocs::Vector{Int32}, ssavaluetypes::Vector{Any},
+                  src::CodeInfo)
+    return CodeInfo(stmts, codelocs, ssavaluetypes, UInt8[], src)
+end
+
 function invoke_api(li::CodeInstance)
     return ccall(:jl_invoke_api, Cint, (Any,), li)
 end
