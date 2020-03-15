@@ -691,7 +691,7 @@ JL_DLLEXPORT void jl_checked_assignment(jl_binding_t *b, jl_value_t *rhs)
                 jl_errorf("invalid redefinition of constant %s",
                           jl_symbol_name(b->name));
             }
-            jl_printf(JL_STDERR, "WARNING: redefining constant %s\n",
+            jl_printf(JL_STDERR, "WARNING: redefinition of constant %s may cause Julia to fail\n",
                       jl_symbol_name(b->name));
         }
     }
