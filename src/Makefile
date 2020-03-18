@@ -106,7 +106,7 @@ else
 ifneq ($(USE_LLVM_SHLIB),1)
 LLVMLINK += $(LLVM_LDFLAGS) $(shell $(LLVM_CONFIG_HOST) --libs $(LLVM_LIBS)) $($(LLVM_LDFLAGS) $(shell $(LLVM_CONFIG_HOST) --system-libs 2> /dev/null)
 else
-LLVMLINK += $(LLVM_LDFLAGS) -lLLVM
+LLVMLINK += $(LLVM_LDFLAGS) -lLLVM $(call rpath_rel_link,$(shell $(LLVM_CONFIG_HOST) --libdir))
 endif
 endif
 ifeq ($(USE_LLVM_SHLIB),1)
@@ -119,8 +119,8 @@ ifeq ($(OS), Darwin)
 CLANG_LDFLAGS += -Wl,-undefined,dynamic_lookup
 endif
 
-
-COMMON_LIBS := -L$(build_shlibdir) -L$(build_libdir) $(LIBUV) $(LIBUTF8PROC) $(NO_WHOLE_ARCHIVE) $(LLVMLINK) $(OSLIBS) $(LIBUNWIND)
+CSLLINK = $(call rpath_rel_link,$(CSL_SHLIBDIR))
+COMMON_LIBS := -L$(build_shlibdir) -L$(build_libdir) $(LIBUV) $(LIBUTF8PROC) $(NO_WHOLE_ARCHIVE) $(LLVMLINK) $(OSLIBS) $(LIBUNWIND) $(CSLLINK)
 DEBUG_LIBS := $(WHOLE_ARCHIVE) $(BUILDDIR)/flisp/libflisp-debug.a $(WHOLE_ARCHIVE) $(BUILDDIR)/support/libsupport-debug.a $(COMMON_LIBS)
 RELEASE_LIBS := $(WHOLE_ARCHIVE) $(BUILDDIR)/flisp/libflisp.a $(WHOLE_ARCHIVE) $(BUILDDIR)/support/libsupport.a $(COMMON_LIBS)
 
@@ -314,7 +314,7 @@ else
 endif
 
 $(build_shlibdir)/libjulia-debug.$(JL_MAJOR_MINOR_SHLIB_EXT): $(SRCDIR)/julia.expmap $(DOBJS) $(BUILDDIR)/flisp/libflisp-debug.a $(BUILDDIR)/support/libsupport-debug.a $(LIBUV)
-	@$(call PRINT_LINK, $(CXXLD) $(JCXXFLAGS) $(CXXLDFLAGS) $(DEBUGFLAGS) $(DOBJS) $(RPATH_LIB) -o $@ $(JLDFLAGS) $(JLIBLDFLAGS) $(DEBUG_LIBS) $(SONAME_DEBUG))
+	@$(call PRINT_LINK, $(CXXLD) $(JCXXFLAGS) $(CXXLDFLAGS) $(DEBUGFLAGS) $(DOBJS) $(RPATH) -o $@ $(JLDFLAGS) $(JLIBLDFLAGS) $(DEBUG_LIBS) $(SONAME_DEBUG))
 	$(INSTALL_NAME_CMD)libjulia-debug.$(SHLIB_EXT) $@
 ifneq ($(OS), WINNT)
 	@ln -sf libjulia-debug.$(JL_MAJOR_MINOR_SHLIB_EXT) $(build_shlibdir)/libjulia-debug.$(JL_MAJOR_SHLIB_EXT)
@@ -329,7 +329,7 @@ $(BUILDDIR)/libjulia-debug.a: $(SRCDIR)/julia.expmap $(DOBJS) $(BUILDDIR)/flisp/
 libjulia-debug: $(build_shlibdir)/libjulia-debug.$(JL_MAJOR_MINOR_SHLIB_EXT) $(PUBLIC_HEADER_TARGETS)
 
 $(build_shlibdir)/libjulia.$(JL_MAJOR_MINOR_SHLIB_EXT): $(SRCDIR)/julia.expmap $(OBJS) $(BUILDDIR)/flisp/libflisp.a $(BUILDDIR)/support/libsupport.a $(LIBUV)
-	@$(call PRINT_LINK, $(CXXLD) $(JCXXFLAGS) $(CXXLDFLAGS) $(SHIPFLAGS) $(OBJS) $(RPATH_LIB) -o $@ $(JLDFLAGS) $(JLIBLDFLAGS) $(RELEASE_LIBS) $(SONAME))
+	@$(call PRINT_LINK, $(CXXLD) $(JCXXFLAGS) $(CXXLDFLAGS) $(SHIPFLAGS) $(OBJS) $(RPATH) -o $@ $(JLDFLAGS) $(JLIBLDFLAGS) $(RELEASE_LIBS) $(SONAME))
 	$(INSTALL_NAME_CMD)libjulia.$(SHLIB_EXT) $@
 ifneq ($(OS), WINNT)
 	@ln -sf libjulia.$(JL_MAJOR_MINOR_SHLIB_EXT) $(build_shlibdir)/libjulia.$(JL_MAJOR_SHLIB_EXT)

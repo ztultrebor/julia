@@ -493,15 +493,19 @@ update-llvm:
 	cd $(LLVM_MONOSRC_DIR) && \
 		git pull --ff-only
 endif
-else # USE_BINARYBUILDER_LLVM
-ifneq ($(BINARYBUILDER_LLVM_ASSERTS), 1)
-LLVM_BB_URL_BASE := https://github.com/JuliaBinaryWrappers/LLVM_jll.jl/releases/download/LLVM-v$(LLVM_VER)+$(LLVM_BB_REL)
-LLVM_BB_NAME := LLVM.v$(LLVM_VER)
-else
-LLVM_BB_URL_BASE := https://github.com/JuliaBinaryWrappers/LLVM_assert_jll.jl/releases/download/LLVM_assert-v$(LLVM_VER)+$(LLVM_BB_REL)
-LLVM_BB_NAME := LLVM_assert.v$(LLVM_VER)
-endif
 
-$(eval $(call bb-install,llvm,false,true))
+# If we built our own LLVM, we need to generate a fake libLLVM_jll package to load it in:
+$(eval $(call jll-generate,libLLVM_jll,libllvm=\"libLLVM\", \
+                                       llvm_config=\"llvm-config\", \
+                           8f36deef-c2a5-5394-99ed-8e07531fb29a,))
+install-llvm: install-libLLVM_jll
+
+else # USE_BINARYBUILDER_LLVM
+
+# Install libLLVM_jll into our stdlib folder
+$(eval $(call install-jll-and-artifact,libLLVM_jll))
+
+# Insert llvm -> libLLVM naming adapters
+$(eval $(call fix-artifact-naming-mismatch,llvm,libLLVM_jll))
 
 endif # USE_BINARYBUILDER_LLVM

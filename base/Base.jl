@@ -373,6 +373,12 @@ include("docs/basedocs.jl")
 
 include("client.jl")
 
+# Ensure we are including two important JLLs; CompilerSupportLibraries and libLLVM
+@include_stdlib_jll("CompilerSupportLibraries_jll")
+using .CompilerSupportLibraries_jll
+@include_stdlib_jll("libLLVM_jll")
+using .libLLVM_jll
+
 # Documentation -- should always be included last in sysimg.
 include("docs/Docs.jl")
 using .Docs

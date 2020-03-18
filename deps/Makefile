@@ -160,6 +160,9 @@ endif
 # Add our fake muxing JLL packages
 DEP_LIBS += BLAS_jll Libm_jll
 
+# Add CSL onto the end
+DEP_LIBS += compilersupportlibraries
+
 ifneq ($(OS), WINNT)
 DEP_LIBS += libwhich
 endif
@@ -205,5 +208,6 @@ include $(SRCDIR)/libgit2.mk
 include $(SRCDIR)/libwhich.mk
 include $(SRCDIR)/zlib.mk
 include $(SRCDIR)/p7zip.mk
+include $(SRCDIR)/csl.mk
 
 include $(SRCDIR)/tools/uninstallers.mk

@@ -81,7 +81,7 @@ $(eval $(call jll-generate,LibCURL_jll,libcurl=\"libcurl\",,deac9b47-8bc7-5906-a
                            LibSSH2_jll=29816b5a-b9ab-546f-933c-edad1886dfa8 \
 						   MbedTLS_jll=c8ffd9c3-330d-5841-b78e-0817d7145fa1 \
 						   Zlib_jll=83775a58-1f1d-513f-b197-d71354ab007a))
-install-curl: install-LibCURL_jll
+install-curl: install-libLLVM_jll
 
 else # USE_BINARYBUILDER_CURL
 

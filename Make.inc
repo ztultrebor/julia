@@ -623,6 +623,7 @@ else
   _GCCVER := $(_GCCMAJOR)
 endif
 
+# NABIL: remove this stuff
 # Allow the user to specify this in Make.user
 GCCPATH ?= $(LOCALBASE)/lib/gcc$(_GCCVER)
 
@@ -681,6 +682,9 @@ $(shell echo $1 | tr a-z A-Z)
 endef
 define lowercase
 $(shell echo $1 | tr A-Z a-z)
+endef
+define shell_escape
+$(subst \\,\\\\,$(subst $$,$$$$,$(1)))
 endef
 
 # ===========================================================================
@@ -892,34 +896,6 @@ ifeq ($(ISX86),1)
 endif
 endif
 
-ifeq ($(origin LLVM_CONFIG), undefined)
-ifeq ($(USE_SYSTEM_LLVM), 1)
-LLVM_CONFIG := llvm-config$(EXE)
-else
-LLVM_CONFIG := $(build_depsbindir)/llvm-config$(EXE)
-endif
-endif # LLVM_CONFIG undefined
-
-ifeq ($(USE_SYSTEM_LLVM), 1)
-JCPPFLAGS+=-DSYSTEM_LLVM
-endif # SYSTEM_LLVM
-
-ifeq ($(BUILD_OS),$(OS))
-LLVM_CONFIG_HOST := $(LLVM_CONFIG)
-else
-LLVM_CONFIG_HOST := $(basename $(LLVM_CONFIG))-host$(BUILD_EXE)
-ifeq (exists, $(shell [ -f '$(LLVM_CONFIG_HOST)' ] && echo exists ))
-ifeq ($(shell $(LLVM_CONFIG_HOST) --version),3.3)
-# llvm-config-host <= 3.3 is broken, use llvm-config instead (in an emulator)
-# use delayed expansion (= not :=) because spawn isn't defined until later
-LLVM_CONFIG_HOST = $(call spawn,$(LLVM_CONFIG))
-endif
-else
-# llvm-config-host does not exist (cmake build)
-LLVM_CONFIG_HOST = $(call spawn,$(LLVM_CONFIG))
-endif
-endif
-
 ifeq ($(USE_SYSTEM_PCRE), 1)
 PCRE_CONFIG := pcre2-config
 else
@@ -1024,7 +1000,7 @@ USE_BINARYBUILDER ?= 0
 endif
 
 # This is the set of projects that BinaryBuilder dependencies are hooked up for.
-BB_PROJECTS := OPENBLAS LLVM SUITESPARSE OPENLIBM GMP MBEDTLS LIBSSH2 MPFR CURL LIBGIT2 PCRE LIBUV LIBUNWIND DSFMT OBJCONV ZLIB P7ZIP
+BB_PROJECTS := OPENBLAS LLVM SUITESPARSE OPENLIBM GMP MBEDTLS LIBSSH2 MPFR CURL LIBGIT2 PCRE LIBUV LIBUNWIND DSFMT OBJCONV ZLIB P7ZIP CSL
 define SET_BB_DEFAULT
 # First, check to see if BB is disabled on a global setting
 ifeq ($$(USE_BINARYBUILDER),0)
@@ -1114,7 +1090,7 @@ ifneq ($(OS),Darwin)
   JCPPFLAGS+=-DSYSTEM_LIBUNWIND
 endif # $(OS) != Darwin
 
-else
+else # USE_SYSTEM_LIBUNWIND
 # If we're using BB unwind, choose the JLL name here:
 ifeq ($(OS),Darwin)
   LIBUNWIND_JLL_NAME = LibOSXUnwind_jll
@@ -1139,6 +1115,38 @@ endif # $(USE_BINARYBUILDER_LIBUNWIND)
 endif # $(USE_SYSTEM_LIBUNWIND)
 endif # $(OS) == WINNT
 
+ifeq ($(USE_BINARYBUILDER_CSL),1)
+CSL_JLL_DIR = $(call find_jll,CompilerSupportLibraries_jll)
+CSL_SHLIBDIR = $(call hit_cache,CSL_JLL_DIR)/$(binlib)
+endif
+
+
+ifeq ($(origin LLVM_CONFIG), undefined)
+ifeq ($(USE_SYSTEM_LLVM), 1)
+  LLVM_CONFIG = llvm-config$(EXE)
+else
+ifeq ($(USE_BINARYBUILDER_LLVM),1)
+  LLVM_JLL_DIR = $(call find_jll,libLLVM_jll)
+  LLVM_CONFIG = $(LLVM_JLL_DIR)/tools/llvm-config$(EXE)
+else
+  LLVM_CONFIG = $(build_bindir)/llvm-config$(EXE)
+endif # USE_BINARYBUILDER_LLVM
+endif # USE_SYSTEM_LLVM
+endif # LLVM_CONFIG undefined
+
+ifeq ($(USE_SYSTEM_LLVM), 1)
+  JCPPFLAGS+=-DSYSTEM_LLVM
+endif # SYSTEM_LLVM
+
+ifeq ($(BUILD_OS),$(OS))
+  LLVM_CONFIG_HOST := $(LLVM_CONFIG)
+else
+  LLVM_CONFIG_HOST := $(basename $(LLVM_CONFIG))-host$(BUILD_EXE)
+ifneq (exists, $(shell [ -f '$(LLVM_CONFIG_HOST)' ] && echo exists ))
+  # llvm-config-host does not exist (cmake build)
+  LLVM_CONFIG_HOST := $(call spawn,$(LLVM_CONFIG))
+endif
+endif
 
 # Use the LLVM Assertions build
 BINARYBUILDER_LLVM_ASSERTS ?= 0
@@ -1164,33 +1172,40 @@ else
   DSYMUTIL := true -ignore
 endif
 
-# Define rpath_link_flag that adds an `-Wl,-rpath-link,$(1)` to linker invocations on non-Windows platforms
+# Add rpath flag helper functions
 ifneq (,$(filter $(OS),WINNT emscripten))
-define rpath_link_flag
+# Windows has no RPATH, so just don't add linker flags here
+define rpath_link
+endef
+define rpath_rel_link
 endef
 else
-define rpath_link_flag
--Wl,-rpath-link,$(1)
+
+# Macos/windows call RPATH stuff differently
+ifeq ($(OS),Darwin)
+RPATH_ORIGIN_ROOT := @loader_path
+else
+RPATH_ORIGIN_ROOT := $$ORIGIN
+# This seems to only be necessary on FreeBSD (musl and glibc ignore `DF_ORIGIN`),
+# but we set it everywhere for consistency, and because it doesn't hurt anything.
+RPATH_ENABLE_FLAG := -Wl,-z,origin
+endif
+
+define rpath_link
+-Wl,-rpath='$(1)' $(RPATH_ENABLE_FLAG)
 endef
 endif
 
+# Helper function for OS-independent relative RPATH links
+define rpath_rel_link
+$(call rpath_link,$(RPATH_ORIGIN_ROOT)/$(shell $(JULIAHOME)/contrib/relative_path.sh $(build_bindir) $(1)))
+endef
+
+
 # shared library runtime paths
-ifneq (,$(filter $(OS),WINNT emscripten))
-  RPATH :=
-  RPATH_ORIGIN :=
-  RPATH_ESCAPED_ORIGIN :=
-  RPATH_LIB :=
-else ifeq ($(OS), Darwin)
-  RPATH := -Wl,-rpath,'@executable_path/$(build_libdir_rel)'
-  RPATH_ORIGIN := -Wl,-rpath,'@loader_path/'
-  RPATH_ESCAPED_ORIGIN := $(RPATH_ORIGIN)
-  RPATH_LIB := -Wl,-rpath,'@loader_path/julia/' -Wl,-rpath,'@loader_path/'
-else
-  RPATH := -Wl,-rpath,'$$ORIGIN/$(build_libdir_rel)' -Wl,-rpath,'$$ORIGIN/$(build_private_libdir_rel)' -Wl,-rpath-link,$(build_shlibdir) -Wl,-z,origin
-  RPATH_ORIGIN := -Wl,-rpath,'$$ORIGIN' -Wl,-z,origin
-  RPATH_ESCAPED_ORIGIN := -Wl,-rpath,'\$$\$$ORIGIN' -Wl,-z,origin -Wl,-rpath-link,$(build_shlibdir)
-  RPATH_LIB := -Wl,-rpath,'$$ORIGIN/julia' -Wl,-rpath,'$$ORIGIN' -Wl,-z,origin
-endif
+RPATH := $(call rpath_rel_link,$(build_private_libdir)) $(call rpath_rel_link,$(build_shlibdir))
+RPATH_ORIGIN := $(call rpath_link,$(RPATH_ORIGIN_ROOT))
+RPATH_ESCAPED_ORIGIN := $(call shell_escape,$(RPATH_ORIGIN))
 
 # --whole-archive
 ifeq ($(OS), Darwin)
@@ -1314,7 +1329,7 @@ LIBLAPACKNAME := libmkl_rt
 MKL_LDFLAGS := -L$(MKLLIB) -lmkl_rt
 ifneq ($(strip $(MKLLIB)),)
   ifeq ($(OS), Linux)
-    RPATH_MKL := -Wl,-rpath,$(MKLLIB)
+    RPATH_MKL := $(call rpath_link,$(MKLLIB))
     RPATH     += $(RPATH_MKL)
     MKL_LDFLAGS += $(RPATH_MKL)
   endif
