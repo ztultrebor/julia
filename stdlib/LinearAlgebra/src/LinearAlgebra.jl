@@ -386,6 +386,11 @@ const ⋅ = dot
 const × = cross
 export ⋅, ×
 
+# Allow passing ⋅, ⊙, and ⊗ as an operator to `map` and similar
+⊙(a, b) = a .* b
+⊗(a, b) = a * b'
+export ⊙, ⊗
+
 """
     LinearAlgebra.peakflops(n::Integer=2000; parallel::Bool=false)
 

@@ -11,6 +11,7 @@ New language features
   macros and matrix constructors, which are whitespace sensitive, because expressions like
   `[a ±b]` now get parsed as `[a ±(b)]` instead of `[±(a, b)]`. ([#34200])
 
+
 Language changes
 ----------------
 
@@ -102,6 +103,8 @@ Standard library changes
 * `normalize` now supports multidimensional arrays ([#34239])
 * `lq` factorizations can now be used to compute the minimum-norm solution to under-determined systems ([#34350]).
 * The BLAS submodule now supports the level-2 BLAS subroutine `spmv!` ([#34320]).
+* `⊙` can be used as an elementwise multiplication operator, and `⊗`
+  as the outer product operator.
 
 #### Markdown
 

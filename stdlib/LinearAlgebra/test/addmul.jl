@@ -131,6 +131,16 @@ for cmat in mattypes,
     push!(testdata, (cmat{celt}, amat{aelt}, bmat{belt}))
 end
 
+@testset "Alternative multiplication operators" begin
+    for T in (Int, Float32, Float64, BigFloat)
+        a = [T[1, 2], T[-3, 7]]
+        b = [T[5, 11], T[-13, 17]]
+        @test map(⋅, a, b) == [27, 158]
+        @test map(⊙, a, b) == [a[1].*b[1], a[2].*b[2]]
+        @test map(⊗, a, b) == [a[1]*b[1]', a[2]*b[2]']
+    end
+end
+
 @testset "mul!(::$TC, ::$TA, ::$TB, α, β)" for (TC, TA, TB) in testdata
     if needsquare(TA)
         na1 = na2 = rand(sizecandidates)
