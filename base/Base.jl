@@ -263,9 +263,24 @@ include("process.jl")
 include("grisu/grisu.jl")
 include("secretbuffer.jl")
 
+# basic data structures
+include("ordering.jl")
+using .Order
+
+# Combinatorics
+include("sort.jl")
+using .Sort
+
+# reduction along dims
+include("reducedim.jl")  # macros in this file relies on string.jl
+include("accumulate.jl")
+
+
+
 # core math functions.  They occasionally need to ccall() out to Libm
 @include_stdlib_jll("Libm_jll")
 using .Libm_jll
+Libm_jll.__init__()
 include("floatfuncs.jl")
 include("math.jl")
 using .Math
@@ -287,18 +302,6 @@ let SOURCE_PATH = ""
         return result
     end
 end
-
-# reduction along dims
-include("reducedim.jl")  # macros in this file relies on string.jl
-include("accumulate.jl")
-
-# basic data structures
-include("ordering.jl")
-using .Order
-
-# Combinatorics
-include("sort.jl")
-using .Sort
 
 # Fast math
 include("fastmath.jl")
@@ -376,6 +379,7 @@ include("client.jl")
 # Ensure we are including two important JLLs; CompilerSupportLibraries and libLLVM
 @include_stdlib_jll("CompilerSupportLibraries_jll")
 using .CompilerSupportLibraries_jll
+CompilerSupportLibraries_jll.__init__()
 @include_stdlib_jll("libLLVM_jll")
 using .libLLVM_jll
 
