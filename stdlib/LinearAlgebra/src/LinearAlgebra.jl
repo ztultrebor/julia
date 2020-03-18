@@ -386,10 +386,11 @@ const ⋅ = dot
 const × = cross
 export ⋅, ×
 
-# Allow passing ⋅, ⊙, and ⊗ as an operator to `map` and similar
-⊙(a, b) = a .* b
-⊗(a, b) = a * b'
-export ⊙, ⊗
+# Allow passing ⋅, .*, and ⊗ as an operator to `map` and similar
+const var".*" = (x...,) -> .*(x...,)
+⊗(a::AbstractVector, b::AbstractVector) = a * transpose(b)
+⊗(A::AbstractArray, B::AbstractArray) = A .* reshape(B, ntuple(_->Base.OneTo(1), ndims(A))..., axes(B)...)
+export .*, ⊗
 
 """
     LinearAlgebra.peakflops(n::Integer=2000; parallel::Bool=false)

@@ -135,9 +135,20 @@ end
     for T in (Int, Float32, Float64, BigFloat)
         a = [T[1, 2], T[-3, 7]]
         b = [T[5, 11], T[-13, 17]]
-        @test map(⋅, a, b) == [27, 158]
-        @test map(⊙, a, b) == [a[1].*b[1], a[2].*b[2]]
-        @test map(⊗, a, b) == [a[1]*b[1]', a[2]*b[2]']
+        @test map(⋅, a, b)  == [27, 158]
+        @test map(.*, a, b) == [a[1].*b[1], a[2].*b[2]]
+        @test map(⊗, a, b)  == [a[1]*b[1]', a[2]*b[2]']
+    end
+    u, v = [2+2im, 3+5im], [1-3im, 7+3im]
+    @test u ⋅ v == conj(u[1])*v[1] + conj(u[2])*v[2]
+    @test u ⊗ v == [u[1]*v[1] u[1]*v[2]; u[2]*v[1] u[2]*v[2]]
+    for (A, B, b) in (([1 2; 3 4], [5 6; 7 8], [5,6]),
+                      ([1+0.8im 2+0.7im; 3+0.6im 4+0.5im],
+                       [5+0.4im 6+0.3im; 7+0.2im 8+0.1im],
+                       [5+0.6im,6+0.3im]))
+        @test A ⊗ b == cat(A*b[1], A*b[2]; dims=3)
+        @test A ⊗ B == cat(cat(A*B[1,1], A*B[2,1]; dims=3),
+                           cat(A*B[1,2], A*B[2,2]; dims=3); dims=4)
     end
 end
 
