@@ -103,8 +103,8 @@ Standard library changes
 * `normalize` now supports multidimensional arrays ([#34239])
 * `lq` factorizations can now be used to compute the minimum-norm solution to under-determined systems ([#34350]).
 * The BLAS submodule now supports the level-2 BLAS subroutine `spmv!` ([#34320]).
-* `⊙` can be used as an elementwise multiplication operator, and `⊗`
-  as the outer product operator.
+* `⊙` (`\odotTAB`) can be used as an elementwise multiplication operator,
+  and `⊗` (`\otimesTAB`) as the outer product operator ([#35150]).
 
 #### Markdown
 
