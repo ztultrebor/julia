@@ -28,11 +28,13 @@ $$($(1)_SRC_DIR)/src/$(1).jl: | $$($(1)_SRC_DIR)
 	@echo "module $(strip $(1))" > "$$@"
 	@echo "using Base.Libc.Libdl" >> "$$@"
 	@echo "const PATH_list = String[]; const LIBPATH_list = String[]" >> "$$@"
-	@# Generate `using $dep` for each dependency
+	@# Generate `using $dep` for each dependency.  Note that we also must generate
+	@# manual `$dep.__init__()` calls.
 	@for deppair in $(5); do \
 		name=$$$$(echo $$$${deppair} | cut -d'=' -f1); \
 		echo "Base.@include_stdlib_jll(\"$$$${name}\")" >> "$$@"; \
 		echo "using .$$$${name}" >> "$$@"; \
+		echo "$$$${name}.__init__()" >> "$$@"; \
 	done
 
 	@# Generate placeholder global variables for all libraries we're going to export

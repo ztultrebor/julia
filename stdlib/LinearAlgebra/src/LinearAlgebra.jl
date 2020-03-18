@@ -160,6 +160,7 @@ end
 # polymorphizing on USE_BLAS64.
 Base.@include_stdlib_jll("BLAS_jll")
 using .BLAS_jll
+BLAS_jll.__init__()
 include("blaslib.jl")
 
 
