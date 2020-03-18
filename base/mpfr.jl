@@ -26,6 +26,7 @@ import .Base.GMP: ClongMax, CulongMax, CdoubleMax, Limb
 import .Base.FastMath.sincos_fast
 Base.@include_stdlib_jll("MPFR_jll")
 using .MPFR_jll
+MPFR_jll.__init__()
 
 version() = VersionNumber(unsafe_string(ccall((:mpfr_get_version,libmpfr), Ptr{Cchar}, ())))
 patches() = split(unsafe_string(ccall((:mpfr_get_patches,libmpfr), Ptr{Cchar}, ())),' ')

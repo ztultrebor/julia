@@ -14,6 +14,7 @@ import .Base: *, +, -, /, <, <<, >>, >>>, <=, ==, >, >=, ^, (~), (&), (|), xor,
 
 Base.@include_stdlib_jll("GMP_jll")
 using .GMP_jll
+GMP_jll.__init__()
 
 if Clong == Int32
     const ClongMax = Union{Int8, Int16, Int32}
