@@ -142,6 +142,9 @@ end
     u, v = [2+2im, 3+5im], [1-3im, 7+3im]
     @test u ⋅ v == conj(u[1])*v[1] + conj(u[2])*v[2]
     @test u ⊗ v == [u[1]*v[1] u[1]*v[2]; u[2]*v[1] u[2]*v[2]]
+    @test outermul(u, v) == u ⊗ v
+    dest = Matrix{Complex{Int}}(undef, 2, 2)
+    @test outermul!(dest, u, v) == u ⊗ v
     for (A, B, b) in (([1 2; 3 4], [5 6; 7 8], [5,6]),
                       ([1+0.8im 2+0.7im; 3+0.6im 4+0.5im],
                        [5+0.4im 6+0.3im; 7+0.2im 8+0.1im],

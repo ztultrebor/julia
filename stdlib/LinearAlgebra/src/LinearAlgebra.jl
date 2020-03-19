@@ -386,11 +386,48 @@ const ⋅ = dot
 const × = cross
 export ⋅, ×
 
-# Allow passing ⋅, .*, and ⊗ as an operator to `map` and similar
+# Allow passing .* as an operator to `map` and similar
 const var".*" = (x...,) -> .*(x...,)
-⊗(a::AbstractVector, b::AbstractVector) = a * transpose(b)
-⊗(A::AbstractArray, B::AbstractArray) = A .* reshape(B, ntuple(_->Base.OneTo(1), ndims(A))..., axes(B)...)
-export .*, ⊗
+
+"""
+    outermul(A, B)
+    A ⊗ B
+
+Compute the tensor product of `A` and `B` (also sometimes called "outer product").
+If `C = A ⊗ B`, then `C[i1, ..., im, j1, ..., jn] = A[i1, ... im] * B[j1, ..., jn]`.
+
+```jldoctest
+julia> a = [2, 3]; b = [5, 7, 11];
+
+julia> a ⊗ b
+2×3 Array{$Int,2}:
+ 10  14  22
+ 15  21  33
+```
+
+See also: [`kron`](@ref).
+"""
+outermul(A::AbstractArray, B::AbstractArray) = A .* reshape(B, ntuple(_->Base.OneTo(1), ndims(A))..., axes(B)...)
+const ⊗ = outermul
+
+"""
+    outermul!(dest, A, B)
+
+Similar to `outermul(A, B)` (which can also be written `A ⊗ B`), but stores its results in the pre-allocated array `dest`.
+"""
+function outermul!(dest::AbstractArray, A::AbstractArray, B::AbstractArray)
+    axes(dest) == (axes(A)..., axes(B)...) ||
+        throw(DimensionMismatch("`axes(dest) = $(axes(dest))` must concatenate `axes(A) = $(axes(A))` and `axes(B) = $(axes(B))`"))
+    for IB in CartesianIndices(B)
+        b = B[IB]
+        @simd for IA in CartesianIndices(A)
+            @inbounds dest[IA,IB] = A[IA]*b
+        end
+    end
+    return dest
+end
+
+export .*, ⊗, outermul, outermul!
 
 """
     LinearAlgebra.peakflops(n::Integer=2000; parallel::Bool=false)
