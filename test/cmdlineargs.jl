@@ -206,10 +206,10 @@ let exename = `$(Base.julia_cmd()) --startup-file=no`
     @test !success(`$exename -t 0`)
     @test !success(`$exename -t -1`)
 
-    # Combining --threads and --procs: --threads does not propagate
+    # Combining --threads and --procs: --threads does propagate
     if cpu_threads > 1; withenv("JULIA_NUM_THREADS"=>nothing) do
         code = "print(sum(remotecall_fetch(Threads.nthreads, x) for x in procs()))"
-        @test read(`$exename -p2 -t2 -e $code`, String) == "4"
+        @test read(`$exename -p2 -t2 -e $code`, String) == "6"
     end end
 
     # --procs
