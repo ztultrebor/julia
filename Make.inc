@@ -1129,7 +1129,7 @@ ifeq ($(USE_BINARYBUILDER_LLVM),1)
   LLVM_JLL_DIR = $(call find_jll,libLLVM_jll)
   LLVM_CONFIG = $(LLVM_JLL_DIR)/tools/llvm-config$(EXE)
 else
-  LLVM_CONFIG = $(build_bindir)/llvm-config$(EXE)
+  LLVM_CONFIG = $(build_depsbindir)/llvm-config$(EXE)
 endif # USE_BINARYBUILDER_LLVM
 endif # USE_SYSTEM_LLVM
 endif # LLVM_CONFIG undefined
@@ -1175,7 +1175,9 @@ endif
 # Add rpath flag helper functions
 ifneq (,$(filter $(OS),WINNT emscripten))
 # Windows has no RPATH, so just don't add linker flags here
-define rpath_link
+define rpath_flag
+endef
+define rpath_link_flag
 endef
 define rpath_rel_link
 endef
@@ -1191,20 +1193,24 @@ RPATH_ORIGIN_ROOT := $$ORIGIN
 RPATH_ENABLE_FLAG := -Wl,-z,origin
 endif
 
-define rpath_link
+define rpath_flag
 -Wl,-rpath,'$(1)' $(RPATH_ENABLE_FLAG)
+endef
+define rpath_link_flag
+-Wl,-rpath-link,'$(1)' $(RPATH_ENABLE_FLAG)
 endef
 endif
 
-# Helper function for OS-independent relative RPATH links
+# Helper function for OS-independent relative RPATH links.  Note that we provide
+# both `-rpath` and `-rpath-link`, but we keep `-rpath-link` as absolute, not relative.
 define rpath_rel_link
-$(call rpath_link,$(RPATH_ORIGIN_ROOT)/$(shell $(JULIAHOME)/contrib/relative_path.sh $(build_bindir) $(1)))
+$(call rpath_flag,$(RPATH_ORIGIN_ROOT)/$(shell $(JULIAHOME)/contrib/relative_path.sh $(build_bindir) $(1))) $(call rpath_link_flag,$(1))
 endef
 
 
 # shared library runtime paths
 RPATH := $(call rpath_rel_link,$(build_private_libdir)) $(call rpath_rel_link,$(build_shlibdir))
-RPATH_ORIGIN := $(call rpath_link,$(RPATH_ORIGIN_ROOT))
+RPATH_ORIGIN := $(call rpath_flag,$(RPATH_ORIGIN_ROOT))
 RPATH_ESCAPED_ORIGIN := $(call shell_escape,$(RPATH_ORIGIN))
 
 # --whole-archive
@@ -1329,7 +1335,7 @@ LIBLAPACKNAME := libmkl_rt
 MKL_LDFLAGS := -L$(MKLLIB) -lmkl_rt
 ifneq ($(strip $(MKLLIB)),)
   ifeq ($(OS), Linux)
-    RPATH_MKL := $(call rpath_link,$(MKLLIB))
+    RPATH_MKL := $(call rpath_flag,$(MKLLIB))
     RPATH     += $(RPATH_MKL)
     MKL_LDFLAGS += $(RPATH_MKL)
   endif
