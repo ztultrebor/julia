@@ -1196,10 +1196,17 @@ endif
 define rpath_flag
 -Wl,-rpath,'$(1)' $(RPATH_ENABLE_FLAG)
 endef
+
+# Darwin does not have `-rpath-link`
+ifneq ($(OS),Darwin)
 define rpath_link_flag
 -Wl,-rpath-link,'$(1)' $(RPATH_ENABLE_FLAG)
 endef
-endif
+else
+define rpath_link_flag
+endef
+endif # $(OS) == Linux
+endif # $(OS) == Windows
 
 # Helper function for OS-independent relative RPATH links.  Note that we provide
 # both `-rpath` and `-rpath-link`, but we keep `-rpath-link` as absolute, not relative.
