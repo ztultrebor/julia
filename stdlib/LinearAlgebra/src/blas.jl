@@ -63,7 +63,7 @@ export
     trsm
 
 import LinearAlgebra
-import LinearAlgebra: BlasReal, BlasComplex, BlasFloat, BlasInt, DimensionMismatch, checksquare, stride1, chkstride1, axpy!
+import LinearAlgebra: BlasReal, BlasComplex, BlasFloat, BlasInt, DimensionMismatch, checksquare, stride1, chkstride1, axpy!, set_num_threads, get_num_threads
 
 
 # Level 1
