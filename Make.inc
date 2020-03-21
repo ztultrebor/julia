@@ -985,7 +985,7 @@ PYTHON_SYSTEM := $(shell $(PYTHON) -c 'from __future__ import print_function; im
 # If we're running on Cygwin, but using a native-windows Python, we need to use cygpath -w
 ifneq ($(and $(filter $(PYTHON_SYSTEM),Windows),$(findstring CYGWIN,$(BUILD_OS))),)
 define invoke_python
-$(PYTHON) "$$(cygpath -w "$(1)")"
+$(PYTHON) `cygpath -w $(1)`
 endef
 else
 define invoke_python
