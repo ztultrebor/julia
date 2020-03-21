@@ -41,7 +41,7 @@ end
     determine_blas_vendor(libblas[]::Ptr)
 
 Given a pointer to a loaded BLAS library, determines its vendor. This currently
-recognizes only two vendor types, `:openblas` or `:mkl`.  If neither can be 
+recognizes only two vendor types, `:openblas` or `:mkl`.
 """
 function determine_blas_vendor(libblas::Ptr)
     vend = :unknown

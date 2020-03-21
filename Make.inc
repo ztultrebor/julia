@@ -1030,7 +1030,8 @@ USE_BINARYBUILDER_LIBOSXUNWIND ?= $(USE_BINARYBUILDER_LIBUNWIND)
 # parse them.  This means that we cannot use `:=` (since we do not want to evaluate these
 # rules now, we want to evaluate them when we use them, so we use `=`) however we also do
 # not want to re-evaluate them multiple times.  So we define a caching mechanism where the
-# rules are still lazily-evaluated, but 
+# rules are still lazily-evaluated, but we cache the value such that the second time around
+# we don't have to re-evaluate them.
 define hit_cache
 $(if $(_CACHE-$(1)),,$(eval _CACHE-$(1) := $($(1))))$(_CACHE-$(1))
 endef
