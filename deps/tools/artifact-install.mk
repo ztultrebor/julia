@@ -22,8 +22,8 @@ $$($(1)_ARTIFACTS_TOML): | extract-$(1)
 # We're going to need to extract information from the Artifacts.toml file pretty often;
 # here's a bash snippet on how to do just that:
 $(1)_GET_META_INFO := \
-	artifact_info="$$$$($(PYTHON) $(JULIAHOME)/contrib/extract_artifact_info.py \
-	                       $$($(1)_ARTIFACTS_TOML) $(BB_TRIPLET_LIBGFORTRAN_CXXABI))"; \
+	artifact_info="$$$$($(call invoke_python,$(JULIAHOME)/contrib/extract_artifact_info.py) \
+	                       $$(call cygpath_w,$$($(1)_ARTIFACTS_TOML)) $(BB_TRIPLET_LIBGFORTRAN_CXXABI))"; \
 	treehash="$$$$(echo $$$${artifact_info} | cut -d' ' -f1)"; \
 	url="$$$$(echo $$$${artifact_info} | cut -d' ' -f2)"; \
 	artifact_dir="$(build_datarootdir)/julia/artifacts/$$$${treehash}"; \

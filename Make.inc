@@ -1037,7 +1037,7 @@ $(if $(_CACHE-$(1)),,$(eval _CACHE-$(1) := $($(1))))$(_CACHE-$(1))
 endef
 
 define artifact_treehash
-$(shell $(PYTHON) $(JULIAHOME)/contrib/extract_artifact_info.py $(build_datarootdir)/julia/stdlib/$(VERSDIR)/$(1)/Artifacts.toml $(BB_TRIPLET_LIBGFORTRAN_CXXABI) 2>/dev/null | cut -d' ' -f1)
+$(shell $(call invoke_python,$(JULIAHOME)/contrib/extract_artifact_info.py) $(call cygpath_w,$(build_datarootdir)/julia/stdlib/$(VERSDIR)/$(1)/Artifacts.toml) $(BB_TRIPLET_LIBGFORTRAN_CXXABI) 2>/dev/null | cut -d' ' -f1)
 endef
 
 define find_jll
