@@ -3,7 +3,6 @@ using Libdl
 # We'll initialize these in `__init__()`
 const libblas = Ref(C_NULL)
 const liblapack = Ref(C_NULL)
-const vendor = Ref(:unknown)
 
 # Julia gets ILP64 assumptions baked-in within `build_h.jl`; we use this to choose the `64_`-suffixed
 # symbols that exist within libopenblas and MKL.
@@ -90,7 +89,7 @@ openblas_get_config() = strip(unsafe_string(ccall(dlsym(libblas[], @blasfunc(ope
 Set the number of threads the BLAS library should use.
 """
 function set_num_threads(n::Integer)
-    blas = vendor()
+    blas = determine_blas_vendor()
     if blas === :openblas
         return ccall(dlsym(libblas[], @blasfunc(:openblas_set_num_threads)), Cvoid, (Int32,), n)
     elseif blas === :mkl
@@ -112,7 +111,7 @@ end
 Return the number of threads the BLAS library will use.
 """
 function get_num_threads()
-    blas = vendor()
+    blas = determine_blas_vendor()
     if blas === :openblas
         return ccall(dlsym(libblas[], @blasfunc(:openblas_get_num_threads)), Cint, ())
     elseif blas === :mkl
