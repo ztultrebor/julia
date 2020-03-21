@@ -31,7 +31,7 @@ $(1)_GET_META_INFO := \
 
 # How to download the artifacts tarball
 $$($(1)_SRC_DIR)/artifact-downloaded: $$($(1)_ARTIFACTS_TOML)
-	@$$($(1)_GET_META_INFO) \
+	$$($(1)_GET_META_INFO) \
 	$(JLDOWNLOAD) "$$$${src_tarball}" "$$$${url}"
 	touch "$$@"
 

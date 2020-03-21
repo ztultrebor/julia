@@ -13,29 +13,12 @@ CPP_STDOUT := $(CPP) -E
 endif
 
 ifeq ($(USE_BINARYBUILDER_PCRE),1)
-PCRE_JLL_DIR = $(call find_jll,PCRE2_jll)
-PCRE_JLL_LIBDIR_rel = $(call binrel_path,$(call hit_cache,PCRE_JLL_DIR)/lib)
+PCRE_JLL_LIBDIR_rel = $(call binrel_path,$(call hit_cache,PCRE_JLL_DIR)/${binlib})
 endif
-
-ifeq ($(USE_BINARYBUILDER_LLVM),1)
-LLVM_JLL_DIR = $(call find_jll,LLVM_jll)
-LLVM_JLL_LIBDIR_rel = $(call binrel_path,$(call hit_cache,LLVM_JLL_DIR)/lib)
-endif
-
-#CSL_JLL_LIBDIR_rel = $(call binrel_path,$(call find_jll,CompilerSupportLibraries_jll))/lib
 
 all: $(addprefix $(BUILDDIR)/,pcre_h.jl errno_h.jl build_h.jl.phony file_constants.jl uv_constants.jl version_git.jl.phony)
 
 PCRE_CONST := 0x[0-9a-fA-F]+|[0-9]+|\([\-0-9]+\)
-ifeq ($(USE_SYSTEM_PCRE), 1)
-  PCRE_INCDIR = $(shell $(PCRE_CONFIG) --prefix)/include
-else
-ifeq ($(USE_BINARYBUILDER_PCRE),1)
-  PCRE_INCDIR = $(call find_jll,PCRE2_jll)/include
-else
-  PCRE_INCDIR = $(build_includedir)
-endif # USE_BINARYBUILDER_PCRE
-endif # USE_SYSTEM_PCRE
 
 ifeq ($(USE_BINARYBUILDER_LIBUV),1)
   LIBUV_INCDIR = $(call find_jll,LibUV_jll)/include
@@ -84,7 +67,6 @@ ifeq ($(OS),WINNT)
 	@printf 'const LIBEXECDIR = "%s"\n' '$(subst /,\\,$(libexecdir_rel))' >> $@
 	@printf 'const PRIVATE_LIBDIR = "%s"\n' '$(subst /,\\,$(private_libdir_rel))' >> $@
 	@printf 'const INCLUDEDIR = "%s"\n' '$(subst /,\\,$(includedir_rel))' >> $@
-	@printf 'const LLVM_JLL_LIBDIR = "%s"\n' '$(subst /,\\,$(LLVM_JLL_LIBDIR_rel))' >> $@
 	@printf 'const PCRE_JLL_LIBDIR = "%s"\n' '$(subst /,\\,$(PCRE_JLL_LIBDIR_rel))' >> $@
 else
 	@echo "const SYSCONFDIR = \"$(sysconfdir_rel)\"" >> $@
@@ -94,7 +76,6 @@ else
 	@echo "const LIBEXECDIR = \"$(libexecdir_rel)\"" >> $@
 	@echo "const PRIVATE_LIBDIR = \"$(private_libdir_rel)\"" >> $@
 	@echo "const INCLUDEDIR = \"$(includedir_rel)\"" >> $@
-	@echo "const LLVM_JLL_LIBDIR = \"$(LLVM_JLL_LIBDIR_rel)\"" >> $@
 	@echo "const PCRE_JLL_LIBDIR = \"$(PCRE_JLL_LIBDIR_rel)\"" >> $@
 endif
 ifeq ($(DARWIN_FRAMEWORK), 1)

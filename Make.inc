@@ -391,6 +391,25 @@ fPIC := -fPIC
 EXE :=
 endif
 
+
+# many of the following targets must be = not := because the expansion of the makefile functions (and $1) shouldn't happen until later
+ifeq ($(BUILD_OS), WINNT) # MSYS
+spawn = $(1)
+cygpath_w = $(1)
+else ifneq (,$(findstring CYGWIN,$(BUILD_OS))) # Cygwin
+spawn = $(1)
+cygpath_w = `cygpath -w $(1)`
+else
+ifeq ($(OS), WINNT) # unix-to-Windows cross-compile
+spawn = wine $(1)
+cygpath_w = `winepath -w $(1)`
+else # not Windows
+spawn = $(1)
+cygpath_w = $(1)
+endif
+endif
+exec = $(shell $(call spawn,$(1)))
+
 JULIACODEGEN := LLVM
 
 # flag for disabling assertions
@@ -896,12 +915,6 @@ ifeq ($(ISX86),1)
 endif
 endif
 
-ifeq ($(USE_SYSTEM_PCRE), 1)
-PCRE_CONFIG := pcre2-config
-else
-PCRE_CONFIG := $(build_depsbindir)/pcre2-config
-endif
-
 ifeq ($(USE_SYSTEM_PATCHELF), 1)
 PATCHELF := patchelf
 else
@@ -1062,6 +1075,20 @@ else
 endif # USE_BINARYBUILDER_LIBUV
 endif # USE_SYSTEM_LIBUV
 
+ifeq ($(USE_SYSTEM_PCRE), 1)
+  PCRE_CONFIG = pcre2-config$(EXE)
+  PCRE_INCDIR_ASK = $(shell $(PCRE_CONFIG) --prefix)/include
+  PCRE_INCDIR = $(call hit_cache,PCRE_INCDIR_ASK)
+else
+ifeq ($(USE_BINARYBUILDER_PCRE),1)
+  PCRE_JLL_DIR = $(call find_jll,PCRE2_jll)
+  PCRE_CONFIG = $(call hit_cache,PCRE_JLL_DIR)/bin/pcre2-config$(EXE)
+  PCRE_INCDIR = $(call hit_cache,PCRE_JLL_DIR)/include
+else
+  PCRE_CONFIG = $(build_depsbindir)/pcre2-config$(EXE)
+  PCRE_INCDIR = $(build_includedir)
+endif
+endif
 
 ifeq ($(USE_SYSTEM_UTF8PROC), 1)
   LIBUTF8PROC = -lutf8proc
@@ -1121,14 +1148,13 @@ CSL_JLL_DIR = $(call find_jll,CompilerSupportLibraries_jll)
 CSL_SHLIBDIR = $(call hit_cache,CSL_JLL_DIR)/$(binlib)
 endif
 
-
 ifeq ($(origin LLVM_CONFIG), undefined)
 ifeq ($(USE_SYSTEM_LLVM), 1)
   LLVM_CONFIG = llvm-config$(EXE)
 else
 ifeq ($(USE_BINARYBUILDER_LLVM),1)
   LLVM_JLL_DIR = $(call find_jll,libLLVM_jll)
-  LLVM_CONFIG = $(LLVM_JLL_DIR)/tools/llvm-config$(EXE)
+  LLVM_CONFIG = $(call hit_cache,LLVM_JLL_DIR)/tools/llvm-config$(EXE)
 else
   LLVM_CONFIG = $(build_depsbindir)/llvm-config$(EXE)
 endif # USE_BINARYBUILDER_LLVM
@@ -1455,25 +1481,6 @@ else
 	@ln -sf $$(abspath $(1)) $$@
 endif
 endef
-
-# many of the following targets must be = not := because the expansion of the makefile functions (and $1) shouldn't happen until later
-ifeq ($(BUILD_OS), WINNT) # MSYS
-spawn = $(1)
-cygpath_w = $(1)
-else ifneq (,$(findstring CYGWIN,$(BUILD_OS))) # Cygwin
-spawn = $(1)
-cygpath_w = `cygpath -w $(1)`
-else
-ifeq ($(OS), WINNT) # unix-to-Windows cross-compile
-spawn = wine $(1)
-cygpath_w = `winepath -w $(1)`
-else # not Windows
-spawn = $(1)
-cygpath_w = $(1)
-endif
-endif
-
-exec = $(shell $(call spawn,$(1)))
 
 JULIA_BUILD_MODE := release
 ifeq (,$(findstring release,$(MAKECMDGOALS)))
