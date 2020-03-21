@@ -31,7 +31,7 @@ $$($(1)_SRC_DIR)/Artifacts.toml: | extract-$(1)
 
 $$($(1)_SRC_DIR)/jll-rewritten: $$($(1)_SRC_DIR)/Artifacts.toml
 	@GEN_SRC="$$($(1)_SRC_DIR)/src/$(1).jl"; \
-	ARTIFACT_INFO="$$$$($(call invoke_python,$(JULIAHOME)/contrib/extract_artifact_info.py) "$$(call cygpath_w,$$<)" $(BB_TRIPLET_LIBGFORTRAN_CXXABI))"; \
+	ARTIFACT_INFO="$$$$($(call invoke_python,$(JULIAHOME)/contrib/extract_artifact_info.py) $$(call cygpath_w,$$<) $(BB_TRIPLET_LIBGFORTRAN_CXXABI))"; \
 	TREEHASH="$$$$(echo $$$${ARTIFACT_INFO} | cut -d ' ' -f1)"; \
 	TRIPLET="$$$$(echo $$$${ARTIFACT_INFO} | cut -d ' ' -f3)"; \
 	WRAPPER="$$($(1)_SRC_DIR)/src/wrappers/$$$${TRIPLET}.jl"; \
