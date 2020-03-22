@@ -200,8 +200,6 @@ ifeq ($$(BUILD_OS), WINNT)
 	cmd //C mklink //J $$(call mingw_to_dos,$3/$1,cd $3 &&) $$(call mingw_to_dos,$$(BUILDDIR)/$2,)
 else ifneq (,$$(findstring CYGWIN,$$(BUILD_OS)))
 	cmd /C mklink /J $$(call cygpath_w,$3/$1) $$(call cygpath_w,$$(BUILDDIR)/$2)
-else ifdef JULIA_VAGRANT_BUILD
-	cp -R $$(BUILDDIR)/$2 $3/$1
 else
 	ln -sf $$(abspath $$(BUILDDIR)/$2) $3/$1
 endif
