@@ -1161,7 +1161,7 @@ ifeq ($(USE_BINARYBUILDER_LLVM),1)
 # If we're on windows/cygwin, llvm-config and llvm-config-host won't have
 # RPATHs and may require some help finding their supporting libraries:
 ifneq (,$(findstring CYGWIN,$(BUILD_OS))$(findstring WINNT,$(BUILD_OS)))
-  LLVM_CONFIG_PATH_ADJUST = PATH=$$PATH:$(call hit_cache,LLVM_JLL_DIR)/bin
+  LLVM_CONFIG_PATH_ADJUST = PATH=$$PATH:$(call hit_cache,LLVM_JLL_DIR)/bin:$(CSL_SHLIBDIR)
 endif
 
   LLVM_CONFIG = $(LLVM_CONFIG_PATH_ADJUST) $(call hit_cache,LLVM_JLL_DIR)/tools/llvm-config$(EXE)
