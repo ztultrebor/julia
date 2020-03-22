@@ -42,7 +42,7 @@ end
 Given a pointer to a loaded BLAS library, determines its vendor. This currently
 recognizes only two vendor types, `:openblas` or `:mkl`.
 """
-function determine_blas_vendor(libblas::Ptr)
+function determine_blas_vendor(libblas::Ptr = libblas[])
     vend = :unknown
     if dlsym(libblas, :openblas_set_num_threads; throw_error=false) !== nothing
         vend = :openblas
