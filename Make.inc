@@ -1049,14 +1049,17 @@ define hit_cache
 $(if $(_CACHE-$(1)),,$(eval _CACHE-$(1) := $($(1))))$(_CACHE-$(1))
 endef
 
+# Parse the treehash of a particular artifact for the current platform
 define artifact_treehash
 $(shell $(call invoke_python,$(JULIAHOME)/contrib/extract_artifact_info.py) $(call cygpath_w,$(build_datarootdir)/julia/stdlib/$(VERSDIR)/$(1)/Artifacts.toml) $(BB_TRIPLET_LIBGFORTRAN_CXXABI) 2>/dev/null | cut -d' ' -f1)
 endef
 
+# Find the directory an artifact will be unpacked into
 define find_jll
 $(build_datarootdir)/julia/artifacts/$(call artifact_treehash,$(1))
 endef
 
+# Get a path relative to the installed `bin` directory
 define binrel_path
 $(shell $(JULIAHOME)/contrib/relative_path.sh "$(bindir)" "$(1)")
 endef
@@ -1154,7 +1157,14 @@ ifeq ($(USE_SYSTEM_LLVM), 1)
 else
 ifeq ($(USE_BINARYBUILDER_LLVM),1)
   LLVM_JLL_DIR = $(call find_jll,libLLVM_jll)
-  LLVM_CONFIG = $(call hit_cache,LLVM_JLL_DIR)/tools/llvm-config$(EXE)
+
+# If we're on windows/cygwin, llvm-config and llvm-config-host won't have
+# RPATHs and may require some help finding their supporting libraries:
+ifneq (,$(findstring CYGWIN,$(BUILD_OS))$(findstring WINNT,$(BUILD_OS)))
+  LLVM_CONFIG_PATH_ADJUST = PATH=$$PATH:$(call hit_cache,LLVM_JLL_DIR)/bin
+endif
+
+  LLVM_CONFIG = $(LLVM_CONFIG_PATH_ADJUST) $(call hit_cache,LLVM_JLL_DIR)/tools/llvm-config$(EXE)
 else
   LLVM_CONFIG = $(build_depsbindir)/llvm-config$(EXE)
 endif # USE_BINARYBUILDER_LLVM
