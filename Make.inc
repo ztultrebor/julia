@@ -330,6 +330,17 @@ CMAKE_GENERATOR ?= make
 export PKG_CONFIG_PATH = $(JULIAHOME)/usr/lib/pkgconfig
 export PKG_CONFIG_LIBDIR = $(JULIAHOME)/usr/lib/pkgconfig
 
+# Some utility functions
+define uppercase
+$(shell echo $1 | tr a-z A-Z)
+endef
+define lowercase
+$(shell echo $1 | tr A-Z a-z)
+endef
+define shell_escape
+$(subst \\,\\\\,$(subst $$,$$$$,$(1)))
+endef
+
 # Figure out OS and architecture
 BUILD_OS := $(shell uname)
 
@@ -698,17 +709,6 @@ ifeq ($(WITH_GC_DEBUG_ENV), 1)
 JCXXFLAGS += -DGC_DEBUG_ENV
 JCFLAGS += -DGC_DEBUG_ENV
 endif
-
-# Some utility functions
-define uppercase
-$(shell echo $1 | tr a-z A-Z)
-endef
-define lowercase
-$(shell echo $1 | tr A-Z a-z)
-endef
-define shell_escape
-$(subst \\,\\\\,$(subst $$,$$$$,$(1)))
-endef
 
 # ===========================================================================
 

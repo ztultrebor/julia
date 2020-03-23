@@ -94,10 +94,10 @@ UV_HEADERS += uv/*.h
 endif
 PUBLIC_HEADER_TARGETS := $(addprefix $(build_includedir)/julia/,$(notdir $(PUBLIC_HEADERS)) $(UV_HEADERS))
 
-LLVM_LDFLAGS := $(call cygpath,$(shell $(LLVM_CONFIG_HOST) --ldflags))
-# We manually insert `--includedir` here to ensure that we get it when compiling
-# on cygwin, since we have a hard time translating the include directory through
-# cygpath when using the `--cxxflags` option to llvm-config.exe.
+# We manually insert diretories here to ensure that we get the proper path type
+# when compiling on cygwin, since we have a hard time translating paths that start
+# with `-L` or `-I`.
+LLVM_LDFLAGS := $(call cygpath,$(shell $(LLVM_CONFIG_HOST) --libdir)) $(shell $(LLVM_CONFIG_HOST) --ldflags)
 LLVM_CXXFLAGS := -I$(call cygpath,$(shell $(LLVM_CONFIG_HOST) --includedir)) $(shell $(LLVM_CONFIG_HOST) --cxxflags)
 
 ifeq ($(JULIACODEGEN),LLVM)
