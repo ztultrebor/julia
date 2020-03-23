@@ -138,7 +138,7 @@ check-suitesparse-wrapper:
 install-suitesparse-wrapper: $(build_shlibdir)/libsuitesparse_wrapper.$(SHLIB_EXT)
 
 # If we built our own libsuitesparse, we need to generate a fake SuiteSparse_jll package to load it in:
-# SuiteSparse has quite a few LibrayProducts...
+# SuiteSparse has quite a few LibraryProducts...
 $(eval $(call jll-generate,SuiteSparse_jll,libsuitesparseconfig=\"libsuitesparseconfig\" \
                                            libsuitesparse_wrapper=\"libsuitesparse_wrapper\" \
 										   libccolamd=\"libccolamd\" \

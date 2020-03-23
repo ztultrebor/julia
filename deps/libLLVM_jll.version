@@ -1,4 +1,4 @@
 LIBLLVM_JLL_BRANCH = master
-LIBLLVM_JLL_SHA1 = 580da0b13edff66793d87ae9b4dbbab1ddf3b420
+LIBLLVM_JLL_SHA1 = af675900f200c635a86aad100bf9d8dcc3894561
 LIBLLVM_JLL_GIT_URL := git://github.com/JuliaBinaryWrappers/libLLVM_jll.jl.git
 LIBLLVM_JLL_TAR_URL = https://api.github.com/repos/JuliaBinaryWrappers/libLLVM_jll.jl/tarball/$1
