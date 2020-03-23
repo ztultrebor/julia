@@ -97,8 +97,14 @@ PUBLIC_HEADER_TARGETS := $(addprefix $(build_includedir)/julia/,$(notdir $(PUBLI
 # We manually insert diretories here to ensure that we get the proper path type
 # when compiling on cygwin, since we have a hard time translating paths that start
 # with `-L` or `-I`.
-LLVM_LDFLAGS := -L$(call cygpath,$(shell $(LLVM_CONFIG_HOST) --libdir)) -L$(call cygpath,$(shell $(LLVM_CONFIG_HOST) --libdir))/../bin $(shell $(LLVM_CONFIG_HOST) --ldflags)
-LLVM_CXXFLAGS := -I$(call cygpath,$(shell $(LLVM_CONFIG_HOST) --includedir)) $(shell $(LLVM_CONFIG_HOST) --cxxflags)
+LLVM_LDFLAGS := $(shell $(LLVM_CONFIG_HOST) --ldflags)
+LLVM_CXXFLAGS := $(shell $(LLVM_CONFIG_HOST) --cxxflags)
+
+# Because BB puts libllvm in `bin`, we fast-pass our way to some of the directories here:
+ifeq ($(USE_BINARYBUILDER_LLVM),1)
+LLVM_LDFLAGS += -L$(call hit_cache,LLVM_JLL_DIR)/$(binlib)
+LLVM_CXXFLAGS += -I$(call hit_cache,LLVM_JLL_DIR)/include
+endif
 
 ifeq ($(JULIACODEGEN),LLVM)
 ifneq ($(USE_SYSTEM_LLVM),0)
