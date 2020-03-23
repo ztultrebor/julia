@@ -28,6 +28,7 @@ using .Base: sign_mask, exponent_mask, exponent_one,
 using Core.Intrinsics: sqrt_llvm
 
 using .Base: IEEEFloat, Libm_jll
+const libm = Libm_jll.libm
 
 @noinline function throw_complex_domainerror(f::Symbol, x)
     throw(DomainError(x, string("$f will only return a complex result if called with a ",
@@ -561,8 +562,8 @@ Stacktrace:
 log1p(x)
 for f in (:log2, :log10)
     @eval begin
-        @inline ($f)(x::Float64) = nan_dom_err(ccall(($(string(f)), $(libm)), Float64, (Float64,), x), x)
-        @inline ($f)(x::Float32) = nan_dom_err(ccall(($(string(f, "f")), $(libm)), Float32, (Float32,), x), x)
+        @inline ($f)(x::Float64) = nan_dom_err(ccall(($(string(f)), libm), Float64, (Float64,), x), x)
+        @inline ($f)(x::Float32) = nan_dom_err(ccall(($(string(f, "f")), libm), Float32, (Float32,), x), x)
         @inline ($f)(x::Real) = ($f)(float(x))
     end
 end
