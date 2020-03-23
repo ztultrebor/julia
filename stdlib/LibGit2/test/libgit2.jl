@@ -3043,7 +3043,7 @@ mktempdir() do dir
                             deserialize(f)
                         end
                         @test err.code == LibGit2.Error.ERROR
-                        @test lowercase(err.msg) == lowercase("invalid Content-Type: text/plain")
+                        @test lowercase(err.msg) == lowercase("invalid Content-Type: 'text/plain'")
                     end
 
                     # OpenSSL s_server should still be running
