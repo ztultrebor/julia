@@ -411,7 +411,7 @@ cygpath = $(1)
 else ifneq (,$(findstring CYGWIN,$(BUILD_OS))) # Cygwin
 spawn = $(1)
 cygpath_w = `cygpath -w $(1)`
-cygpath = `cygpath $(call shell_escape,$(1))`
+cygpath = `cygpath "$(call shell_escape,$(1))"`
 else
 ifeq ($(OS), WINNT) # unix-to-Windows cross-compile
 spawn = wine $(1)
