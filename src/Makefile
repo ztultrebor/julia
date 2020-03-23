@@ -56,12 +56,12 @@ RUNTIME_SRCS += jitlayers aotcompile debuginfo disasm llvm-simdloop llvm-muladd 
 	llvm-final-gc-lowering llvm-pass-helpers llvm-late-gc-lowering \
 	llvm-lower-handlers llvm-gc-invariant-verifier llvm-propagate-addrspaces \
 	llvm-multiversioning llvm-alloc-opt cgmemmgr llvm-api
-FLAGS += -I$(shell $(LLVM_CONFIG_HOST) --includedir)
+FLAGS += -I$(call cygpath,$(shell $(LLVM_CONFIG_HOST) --includedir))
 LLVM_LIBS := all
 ifeq ($(USE_POLLY),1)
 LLVMLINK += -lPolly -lPollyISL
-FLAGS += -I$(shell $(LLVM_CONFIG_HOST) --src-root)/tools/polly/include
-FLAGS += -I$(shell $(LLVM_CONFIG_HOST) --obj-root)/tools/polly/include
+FLAGS += -I$(call cygpath,$(shell $(LLVM_CONFIG_HOST) --src-root))/tools/polly/include
+FLAGS += -I$(call cygpath,$(shell $(LLVM_CONFIG_HOST) --obj-root))/tools/polly/include
 FLAGS += -DUSE_POLLY
 ifeq ($(USE_POLLY_OPENMP),1)
 FLAGS += -fopenmp
@@ -69,7 +69,7 @@ endif
 ifeq ($(USE_POLLY_ACC),1)
 LLVMLINK += -lPollyPPCG -lGPURuntime
 FLAGS += -DUSE_POLLY_ACC
-FLAGS += -I$(shell $(LLVM_CONFIG_HOST) --src-root)/tools/polly/tools # Required to find GPURuntime/GPUJIT.h
+FLAGS += -I$(call cygpath,$(shell $(LLVM_CONFIG_HOST) --src-root))/tools/polly/tools # Required to find GPURuntime/GPUJIT.h
 endif
 endif
 else
@@ -94,8 +94,8 @@ UV_HEADERS += uv/*.h
 endif
 PUBLIC_HEADER_TARGETS := $(addprefix $(build_includedir)/julia/,$(notdir $(PUBLIC_HEADERS)) $(UV_HEADERS))
 
-LLVM_LDFLAGS := $(shell $(LLVM_CONFIG_HOST) --ldflags)
-LLVM_CXXFLAGS := $(shell $(LLVM_CONFIG_HOST) --cxxflags)
+LLVM_LDFLAGS := $(call cygpath,$(shell $(LLVM_CONFIG_HOST) --ldflags))
+LLVM_CXXFLAGS := $(call cygpath,$(shell $(LLVM_CONFIG_HOST) --cxxflags))
 
 ifeq ($(JULIACODEGEN),LLVM)
 ifneq ($(USE_SYSTEM_LLVM),0)
@@ -104,9 +104,9 @@ LLVMLINK += $(LLVM_LDFLAGS) $(shell $(LLVM_CONFIG_HOST) --libs --system-libs)
 #       https://github.com/JuliaLang/julia/issues/29981
 else
 ifneq ($(USE_LLVM_SHLIB),1)
-LLVMLINK += $(LLVM_LDFLAGS) $(shell $(LLVM_CONFIG_HOST) --libs $(LLVM_LIBS)) $($(LLVM_LDFLAGS) $(shell $(LLVM_CONFIG_HOST) --system-libs 2> /dev/null)
+LLVMLINK += $(LLVM_LDFLAGS) $(shell $(LLVM_CONFIG_HOST) --libs $(LLVM_LIBS)) $(LLVM_LDFLAGS) $(shell $(LLVM_CONFIG_HOST) --system-libs 2> /dev/null)
 else
-LLVMLINK += $(LLVM_LDFLAGS) -lLLVM $(call rpath_rel_link,$(shell $(LLVM_CONFIG_HOST) --libdir))
+LLVMLINK += $(LLVM_LDFLAGS) -lLLVM $(call rpath_rel_link,$(call cygpath,$(shell $(LLVM_CONFIG_HOST) --libdir)))
 endif
 endif
 ifeq ($(USE_LLVM_SHLIB),1)
