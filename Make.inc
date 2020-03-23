@@ -1157,14 +1157,13 @@ ifeq ($(USE_SYSTEM_LLVM), 1)
 else
 ifeq ($(USE_BINARYBUILDER_LLVM),1)
   LLVM_JLL_DIR = $(call find_jll,libLLVM_jll)
+  LLVM_CONFIG = $(call hit_cache,LLVM_JLL_DIR)/tools/llvm-config$(EXE)
 
-# If we're on windows/cygwin, llvm-config and llvm-config-host won't have
-# RPATHs and may require some help finding their supporting libraries:
+# If we're on windows/cygwin, llvm-config-host.exe won't have an
+# RPATH and may require some help finding its supporting libraries:
 ifneq (,$(findstring CYGWIN,$(BUILD_OS))$(findstring WINNT,$(BUILD_OS)))
   LLVM_CONFIG_PATH_ADJUST = PATH=$$PATH:$(call hit_cache,LLVM_JLL_DIR)/bin:$(CSL_SHLIBDIR)
 endif
-
-  LLVM_CONFIG = $(LLVM_CONFIG_PATH_ADJUST) $(call hit_cache,LLVM_JLL_DIR)/tools/llvm-config$(EXE)
 else
   LLVM_CONFIG = $(build_depsbindir)/llvm-config$(EXE)
 endif # USE_BINARYBUILDER_LLVM
@@ -1176,12 +1175,12 @@ ifeq ($(USE_SYSTEM_LLVM), 1)
 endif # SYSTEM_LLVM
 
 ifeq ($(BUILD_OS),$(OS))
-  LLVM_CONFIG_HOST := $(LLVM_CONFIG)
+  LLVM_CONFIG_HOST = $(LLVM_CONFIG_HOST_PATH_ADJUST) $(LLVM_CONFIG)
 else
-  LLVM_CONFIG_HOST := $(basename $(LLVM_CONFIG))-host$(BUILD_EXE)
+  LLVM_CONFIG_HOST = $(LLVM_CONFIG_HOST_PATH_ADJUST) $(basename $(LLVM_CONFIG))-host$(BUILD_EXE)
 ifneq (exists, $(shell [ -f '$(LLVM_CONFIG_HOST)' ] && echo exists ))
   # llvm-config-host does not exist (cmake build)
-  LLVM_CONFIG_HOST := $(call spawn,$(LLVM_CONFIG))
+  LLVM_CONFIG_HOST = $(LLVM_CONFIG_HOST_PATH_ADJUST) $(call spawn,$(LLVM_CONFIG))
 endif
 endif
 
