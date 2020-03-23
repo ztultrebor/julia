@@ -312,7 +312,7 @@ static void jl_ast_ctx_leave(jl_ast_context_t *ctx) JL_NOTSAFEPOINT
     JL_UNLOCK_NOGC(&flisp_lock);
 }
 
-void jl_init_frontend(void)
+void jl_init_flisp(void)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
     if (jl_ast_ctx_using || jl_ast_ctx_freed)
@@ -324,7 +324,10 @@ void jl_init_frontend(void)
     // To match the one in jl_ast_ctx_leave
     JL_SIGATOMIC_BEGIN();
     jl_ast_ctx_leave(&jl_ast_main_ctx);
+}
 
+void jl_init_common_symbols(void)
+{
     empty_sym = jl_symbol("");
     call_sym = jl_symbol("call");
     invoke_sym = jl_symbol("invoke");
@@ -402,7 +405,7 @@ JL_DLLEXPORT void jl_lisp_prompt(void)
     // Make `--lisp` sigatomic in order to avoid triggering the sigint safepoint.
     // We don't have our signal handler registered in that case anyway...
     JL_SIGATOMIC_BEGIN();
-    jl_init_frontend();
+    jl_init_flisp();
     jl_ast_context_t *ctx = jl_ast_ctx_enter();
     JL_AST_PRESERVE_PUSH(ctx, old_roots, jl_main_module);
     fl_context_t *fl_ctx = &ctx->fl;
@@ -853,11 +856,11 @@ JL_DLLEXPORT jl_value_t *jl_parse_input_line(const char *str, size_t len,
     return jl_parse_all(str, len, filename, filename_len);
 }
 
-// parse and eval a whole file, possibly reading from a string (`content`)
-jl_value_t *jl_parse_eval_all(const char *fname,
-                              const char *content, size_t contentlen,
-                              jl_module_t *inmodule,
-                              jl_value_t *mapexpr)
+// Parse a string `text` at top level, attributing source locations to
+// `filename`. Each expression is optionally modified by `mapexpr` (if
+// non-NULL) before evaluating in module `inmodule`.
+jl_value_t *jl_parse_eval_all(jl_module_t *inmodule, jl_value_t *text,
+                              jl_value_t *filename, jl_value_t *mapexpr)
 {
     jl_ptls_t ptls = jl_get_ptls_states();
     if (ptls->in_pure_callback)
@@ -865,25 +868,20 @@ jl_value_t *jl_parse_eval_all(const char *fname,
     jl_ast_context_t *ctx = jl_ast_ctx_enter();
     fl_context_t *fl_ctx = &ctx->fl;
     value_t f, ast, expression;
-    size_t len = strlen(fname);
-    f = cvalue_static_cstrn(fl_ctx, fname, len);
+    f = cvalue_static_cstrn(fl_ctx, jl_string_data(filename), jl_string_len(filename));
     fl_gc_handle(fl_ctx, &f);
-    if (content != NULL) {
+    {
         JL_TIMING(PARSING);
-        value_t t = cvalue_static_cstrn(fl_ctx, content, contentlen);
+        value_t t = cvalue_static_cstrn(fl_ctx, jl_string_data(text),
+                                        jl_string_len(text));
         fl_gc_handle(fl_ctx, &t);
         ast = fl_applyn(fl_ctx, 2, symbol_value(symbol(fl_ctx, "jl-parse-all")), t, f);
         fl_free_gc_handles(fl_ctx, 1);
     }
-    else {
-        JL_TIMING(PARSING);
-        assert(memchr(fname, 0, len) == NULL); // was checked already in jl_load
-        ast = fl_applyn(fl_ctx, 1, symbol_value(symbol(fl_ctx, "jl-parse-file")), f);
-    }
     fl_free_gc_handles(fl_ctx, 1);
     if (ast == fl_ctx->F) {
         jl_ast_ctx_leave(ctx);
-        jl_errorf("could not open file %s", fname);
+        jl_errorf("could not open file %s", jl_string_data(filename));
     }
     fl_gc_handle(fl_ctx, &ast);
     fl_gc_handle(fl_ctx, &expression);
@@ -893,7 +891,7 @@ jl_value_t *jl_parse_eval_all(const char *fname,
     size_t last_age = jl_get_ptls_states()->world_age;
     int lineno = 0;
     jl_lineno = 0;
-    jl_filename = fname;
+    jl_filename = jl_string_data(filename);
     jl_module_t *old_module = ctx->module;
     ctx->module = inmodule;
     jl_value_t *form = NULL;
@@ -923,8 +921,8 @@ jl_value_t *jl_parse_eval_all(const char *fname,
                 expression =
                     fl_applyn(fl_ctx, 4,
                               symbol_value(symbol(fl_ctx, "jl-expand-to-thunk-warn")),
-                              expression, symbol(fl_ctx, fname), fixnum(lineno),
-                              iscons(cdr_(ast)) ? fl_ctx->T : fl_ctx->F);
+                              expression, symbol(fl_ctx, jl_string_data(filename)),
+                              fixnum(lineno), iscons(cdr_(ast)) ? fl_ctx->T : fl_ctx->F);
             }
             jl_get_ptls_states()->world_age = jl_world_counter;
             form = scm_to_julia(fl_ctx, expression, inmodule);
@@ -942,7 +940,7 @@ jl_value_t *jl_parse_eval_all(const char *fname,
         }
     }
     JL_CATCH {
-        form = jl_pchar_to_string(fname, len);
+        form = filename;
         result = jl_box_long(jl_lineno);
         err = 1;
         goto finally; // skip jl_restore_excstack
@@ -963,19 +961,6 @@ finally:
     }
     JL_GC_POP();
     return result;
-}
-
-JL_DLLEXPORT jl_value_t *jl_load_rewrite_file_string(const char *text, size_t len,
-                                                     char *filename, jl_module_t *inmodule,
-                                                     jl_value_t *mapexpr)
-{
-    return jl_parse_eval_all(filename, text, len, inmodule, mapexpr);
-}
-
-JL_DLLEXPORT jl_value_t *jl_load_file_string(const char *text, size_t len,
-                                             char *filename, jl_module_t *inmodule)
-{
-    return jl_parse_eval_all(filename, text, len, inmodule, NULL);
 }
 
 // returns either an expression or a thunk

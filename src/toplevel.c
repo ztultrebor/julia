@@ -865,25 +865,90 @@ JL_DLLEXPORT jl_value_t *jl_infer_thunk(jl_code_info_t *thk, jl_module_t *m)
     return (jl_value_t*)jl_any_type;
 }
 
-JL_DLLEXPORT jl_value_t *jl_load_rewrite(jl_module_t *module, const char *fname, jl_value_t *mapexpr)
+
+//------------------------------------------------------------------------------
+// Code loading: combined parse+eval for include() and include_string()
+
+// Parse julia code from the string `text`, attributing it to `filename`. Eval
+// the resulting statements into `module` after applying `mapexpr` to each one
+// (if not one of NULL or nothing).
+JL_DLLEXPORT jl_value_t *jl_load_rewrite_file_string(jl_module_t *module,
+                                                     jl_value_t *text,
+                                                     jl_value_t *filename,
+                                                     jl_value_t *mapexpr)
 {
-    uv_stat_t stbuf;
-    if (jl_stat(fname, (char*)&stbuf) != 0 || (stbuf.st_mode & S_IFMT) != S_IFREG) {
-        jl_errorf("could not open file %s", fname);
+    if (!jl_is_string(text) || !jl_is_string(filename)) {
+        jl_errorf("Expected `String`s for `text` and `filename`");
     }
-    return jl_parse_eval_all(fname, NULL, 0, module, mapexpr);
+    return jl_parse_eval_all(module, text, filename,
+                             mapexpr == jl_nothing ? NULL : mapexpr);
 }
 
-JL_DLLEXPORT jl_value_t *jl_load(jl_module_t *module, const char *fname)
+// Synchronously read content of entire file into a julia String
+static jl_value_t *jl_file_content_as_string(jl_value_t *filename)
 {
-    return jl_load_rewrite(module, fname, NULL);
+    const char* fname = jl_string_data(filename);
+    ios_t f;
+    if (ios_file(&f, fname, 1, 0, 0, 0) == NULL)
+        jl_errorf("File \"%s\" not found", fname);
+    ios_bufmode(&f, bm_none);
+    ios_seek_end(&f);
+    size_t len = ios_pos(&f);
+    jl_value_t *text = jl_alloc_string(len);
+    ios_seek(&f, 0);
+    if (ios_readall(&f, jl_string_data(text), len) != len)
+        jl_errorf("Error reading file \"%s\"", fname);
+    ios_close(&f);
+    return text;
 }
 
-// load from filename given as a String object
-JL_DLLEXPORT jl_value_t *jl_load_(jl_module_t *module, jl_value_t *str)
+// Load and parse julia code from the file `filename`. Eval the resulting
+// statements into `module` after applying `mapexpr` to each one.
+JL_DLLEXPORT jl_value_t *jl_load_rewrite(jl_module_t *module,
+                                         jl_value_t *filename,
+                                         jl_value_t *mapexpr)
 {
-    // assume String has a hidden '\0' at the end
-    return jl_load(module, (const char*)jl_string_data(str));
+    jl_value_t *text = jl_file_content_as_string(filename);
+    JL_GC_PUSH1(&text);
+    jl_value_t *result = jl_load_rewrite_file_string(module, text, filename, mapexpr);
+    JL_GC_POP();
+    return result;
+}
+
+// Code loading - julia.h C API with native C types
+
+// Parse julia code from `filename` and eval into `module`.
+JL_DLLEXPORT jl_value_t *jl_load(jl_module_t *module, const char *filename)
+{
+    jl_value_t *filename_ = NULL;
+    JL_GC_PUSH1(&filename_);
+    filename_ = jl_cstr_to_string(filename);
+    jl_value_t *result = jl_load_rewrite(module, filename_, jl_nothing);
+    JL_GC_POP();
+    return result;
+}
+
+// Parse julia code from the string `text` of length `len`, attributing it to
+// `filename`. Eval the resulting statements into `module`.
+JL_DLLEXPORT jl_value_t *jl_load_file_string(const char *text, size_t len,
+                                             char *filename, jl_module_t *module)
+{
+    jl_value_t *text_ = NULL;
+    jl_value_t *filename_ = NULL;
+    JL_GC_PUSH2(&text_, &filename_);
+    text_ = jl_pchar_to_string(text, len);
+    filename_ = jl_cstr_to_string(filename);
+    jl_value_t *result = jl_load_rewrite_file_string(module, text_, filename_, jl_nothing);
+    JL_GC_POP();
+    return result;
+}
+
+
+//--------------------------------------------------
+// Code loading helpers for bootstrap
+JL_DLLEXPORT jl_value_t *jl_load_(jl_module_t *module, jl_value_t *filename)
+{
+    return jl_load_rewrite(module, filename, jl_nothing);
 }
 
 JL_DLLEXPORT jl_value_t *jl_prepend_cwd(jl_value_t *str)
