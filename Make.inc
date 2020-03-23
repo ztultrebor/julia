@@ -973,14 +973,6 @@ else
   LIBLAPACKNAME := $(LIBBLASNAME)
 endif # USE_SYSTEM_BLAS
 
-ifeq ($(USE_SYSTEM_LIBM), 1)
-  LIBM := -lm
-  LIBMNAME := libm
-else
-  LIBM := -lopenlibm
-  LIBMNAME := libopenlibm
-endif
-
 # We need python for things like BB triplet recognition.  We don't really care
 # about version, generally, so just find something that works:
 PYTHON := "$(shell which python 2>/dev/null || which python3 2>/dev/null || which python2 2>/dev/null || echo not found)"
@@ -1102,14 +1094,30 @@ ifeq ($(USE_SYSTEM_UTF8PROC), 1)
   UTF8PROC_INC = $(LOCALBASE)/include
 else
 ifeq ($(USE_BINARYBUILDER_UTF8PROC),1)
-  LIBUUTF8PROC_JLL_DIR = $(call find_jll,utf8proc_jll)
-  LIBUTF8PROC = $(call hit_cache,LIBUUTF8PROC_JLL_DIR)/lib/libutf8proc.a
-  UTF8PROC_INC = $(call hit_cache,LIBUUTF8PROC_JLL_DIR)/include
+  LIBUTF8PROC_JLL_DIR = $(call find_jll,utf8proc_jll)
+  LIBUTF8PROC = $(call hit_cache,LIBUTF8PROC_JLL_DIR)/lib/libutf8proc.a
+  UTF8PROC_INC = $(call hit_cache,LIBUTF8PROC_JLL_DIR)/include
 else
   LIBUTF8PROC = $(build_libdir)/libutf8proc.a
   UTF8PROC_INC = $(build_includedir)
 endif # USE_BINARYBUILDER_UTF8PROC
 endif # USE_SYSTEM_UTF8PROC
+
+ifeq ($(USE_SYSTEM_LIBM), 1)
+  LIBM := -lm
+  LIBMNAME := libm
+else
+ifeq ($(USE_BINARYBUILDER_OPENLIBM),1)
+  OPENLIBM_JLL_DIR = $(call find_jll,OpenLibm_jll)
+  OPENLIBM = $(call hit_cache,OPENLIBM_JLL_DIR)/lib/libopenlibm.a
+else
+  OPENLIBM = $(build_libdir)/libopenlibm.a
+endif
+
+  LIBM := -lopenlibm
+  LIBMNAME := libopenlibm
+endif
+
 
 ifeq ($(OS),WINNT)
   # Windows does not use libunwind
