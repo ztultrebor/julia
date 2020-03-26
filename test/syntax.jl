@@ -745,11 +745,11 @@ f1_exprs = get_expr_list(f1_ci)
 f2_exprs = get_expr_list(f2_ci)
 
 if Base.JLOptions().can_inline != 0
-    @test length(f1_ci.linetable) == 4
-    @test length(f2_ci.linetable) >= 4
-else
     @test length(f1_ci.linetable) == 3
-    @test length(f2_ci.linetable) >= 4
+    @test length(f2_ci.linetable) >= 3
+else
+    @test length(f1_ci.linetable) == 2
+    @test length(f2_ci.linetable) >= 3
 end
 
 # Check that string and command literals are parsed to the appropriate macros
