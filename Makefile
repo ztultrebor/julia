@@ -236,42 +236,12 @@ $$(build_depsbindir)/lib$(1).dll: | $$(build_depsbindir)
 JL_TARGETS += $(1)
 endef
 julia-deps: julia-deps-libs
-
-# Given a list of space-separated libraries, return the first library name that is
-# correctly found through `pathsearch`.
-define select_std_dll
-$(firstword $(foreach name,$(1),$(if $(call pathsearch,lib$(name).dll,$(STD_LIB_PATH)),$(name),)))
-endef
-
-$(eval $(call std_dll,$(call select_std_dll,gfortran-3 gfortran-4 gfortran-5)))
-$(eval $(call std_dll,quadmath-0))
-$(eval $(call std_dll,stdc++-6))
-ifeq ($(ARCH),i686)
-$(eval $(call std_dll,gcc_s_sjlj-1))
-else
-$(eval $(call std_dll,gcc_s_seh-1))
-endif
-$(eval $(call std_dll,ssp-0))
-$(eval $(call std_dll,winpthread-1))
-$(eval $(call std_dll,atomic-1))
 endif
 
 
 define stringreplace
 	$(build_depsbindir)/stringreplace $$(strings -t x - $1 | grep '$2' | awk '{print $$1;}') '$3' 255 "$(call cygpath_w,$1)"
 endef
-
-# Run fixup-libgfortran on all platforms but Windows and FreeBSD. On FreeBSD we
-# pull in the GCC libraries earlier and use them for the build to make sure we
-# don't inadvertently link to /lib/libgcc_s.so.1, which is incompatible with
-# libgfortran, and on Windows we copy them in earlier as well.
-# NABIL TODO: Move this to CSL build from source time
-# ifeq (,$(findstring $(OS),FreeBSD WINNT))
-# julia-base: $(build_libdir)/libgfortran*.$(SHLIB_EXT)*
-# $(build_libdir)/libgfortran*.$(SHLIB_EXT)*: | $(build_libdir) julia-deps
-# 	-$(CUSTOM_LD_LIBRARY_PATH) PATH="$(PATH):$(build_depsbindir)" PATCHELF="$(PATCHELF)" FC="$(FC)" $(JULIAHOME)/contrib/fixup-libgfortran.sh --verbose $(build_libdir)
-# JL_PRIVATE_LIBS-0 += libgfortran libgcc_s libquadmath
-# endif
 
 
 install: $(build_depsbindir)/stringreplace $(BUILDROOT)/doc/_build/html/en/index.html

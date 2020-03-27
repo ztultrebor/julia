@@ -22,6 +22,7 @@ BLAS_JLL_LAPACKLIB := \"$(LIBLAPACKNAME)\"
 endif
 
 # Generate our fake BLAS_jll package
+$(build_prefix)/manifest/blas:
 $(eval $(call jll-generate,BLAS_jll,libblas=$(BLAS_JLL_BLASLIB) liblapack=$(BLAS_JLL_LAPACKLIB),, \
 						   f1936524-4db9-4c7a-6f3e-6fc869057263, \
 						   $(BLAS_JLL_DEPS)))

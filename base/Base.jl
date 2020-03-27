@@ -183,7 +183,9 @@ let os = ccall(:jl_get_UNAME, Any, ()),
 
     # Include some paths for JLL libraries that we need (like pcre) that are so early
     # in our boot-up process that we can't use even rewritten JLL packages
-    push!(DL_LOAD_PATH, string(BINDIR, pathsep, Base.PCRE_JLL_LIBDIR))
+    if !isempty(Base.PCRE_JLL_LIBDIR)
+        push!(DL_LOAD_PATH, string(BINDIR, pathsep, Base.PCRE_JLL_LIBDIR))
+    end
 end
 
 include("osutils.jl")

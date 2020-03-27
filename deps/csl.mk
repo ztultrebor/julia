@@ -35,3 +35,15 @@ else # USE_BINARYBUILDER_CSL
 $(eval $(call install-jll-and-artifact,CompilerSupportLibraries_jll))
 
 endif
+
+# Because CSL is a critical piece of infrastructure for us, we need to load it at julia.exe
+# dynamic-link time.  On windows, that means that we need it to be able to find its deps, but
+# since we don't have an RPATH, we have to manually mcjigger the PE file import descriptors:
+ifeq ($(OS),WINNT)
+rewrite-compilersupportlibraries: $(build_prefix)/manifest/CompilerSupportLibraries_jll
+	@for f in $(CompilerSupportLibraries_jll_DIR)/$(binlib)/*.$(SHLIB_EXT); do \
+		echo $(call rewrite_dll_imports,$$f,$(WINNT_REWRITE_LIBS)); \
+		$(call rewrite_dll_imports,$$f,$(WINNT_REWRITE_LIBS)); \
+	done
+install-compilersupportlibraries: rewrite-compilersupportlibraries
+endif

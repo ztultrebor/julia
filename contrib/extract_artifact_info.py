@@ -3,12 +3,23 @@ import toml, sys, os
 artifacts_toml = sys.argv[1]
 platform_triplet = sys.argv[2]
 
-# To debug when TOML files get parsed, uncomment this line
-#sys.stderr.write("PARSING %s\n"%(artifacts_toml))
+# To debug when TOML files get parsed, set this to True
+verbose = False
+
+if verbose:
+    sys.stderr.write("PARSING %s "%(artifacts_toml))
+
+# Fail out gracefully if a file does not exist, printing nothing
+if not os.path.isfile(artifacts_toml):
+    if verbose:
+        sys.stderr.write("SKIP\n")
+    sys.exit(0)
 
 # Get the artifact_name as `MbedTLS_jll-<hash>` -> `MbedTLS`
 artifact_name = os.path.basename(os.path.dirname(artifacts_toml)).split("_jll")[0]
 data = toml.load(artifacts_toml)
+if verbose:
+    sys.stderr.write("OK\n")
 
 # Extract the arch, OS, libc, libgfortran and cxxabi from our platform triplet:
 arch, os, libc, libgfortran, cxxabi = platform_triplet.split("-")

@@ -9,4 +9,5 @@ LIBM_JLL_LIBM := \"$(LIBMNAME)\"
 endif
 
 # Generate our fake Libm_jll package
+$(build_prefix)/manifest/libm:
 $(eval $(call jll-generate,Libm_jll,libm=$(LIBM_JLL_LIBM),,b49a7c6d-e6d2-0dba-4221-0fcbec513d2b,$(LIBM_JLL_DEPS)))

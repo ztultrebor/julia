@@ -84,8 +84,15 @@ endif
 
 $(build_bindir)/julia$(EXE): $(OBJS)
 	@$(call PRINT_LINK, $(CXXLD) $(CXXFLAGS) $(CXXLDFLAGS) $(LINK_FLAGS) $(SHIPFLAGS) $(OBJS) -o $@ -L$(build_private_libdir) -L$(build_libdir) -L$(build_shlibdir) -ljulia $(JLDFLAGS) $(CXXLDFLAGS))
+ifeq ($(OS), WINNT)
+	$(call rewrite_dll_imports,$@,$(WINNT_REWRITE_LIBS))
+endif
+
 $(build_bindir)/julia-debug$(EXE): $(DOBJS)
 	@$(call PRINT_LINK, $(CXXLD) $(CXXFLAGS) $(CXXLDFLAGS) $(LINK_FLAGS) $(DEBUGFLAGS) $(DOBJS) -o $@ -L$(build_private_libdir) -L$(build_libdir) -L$(build_shlibdir) -ljulia-debug $(JLDFLAGS) $(CXXLDFLAGS))
+ifeq ($(OS), WINNT)
+	$(call rewrite_dll_imports,$@,$(WINNT_REWRITE_LIBS))
+endif
 
 clean: | $(CLEAN_TARGETS)
 	rm -f *.o *.dbg.obj

@@ -12,19 +12,9 @@ else
 CPP_STDOUT := $(CPP) -E
 endif
 
-ifeq ($(USE_BINARYBUILDER_PCRE),1)
-PCRE_JLL_LIBDIR_rel = $(call binrel_path,$(call hit_cache,PCRE_JLL_DIR)/${binlib})
-endif
-
 all: $(addprefix $(BUILDDIR)/,pcre_h.jl errno_h.jl build_h.jl.phony file_constants.jl uv_constants.jl version_git.jl.phony)
 
 PCRE_CONST := 0x[0-9a-fA-F]+|[0-9]+|\([\-0-9]+\)
-
-ifeq ($(USE_BINARYBUILDER_LIBUV),1)
-  LIBUV_INCDIR = $(call find_jll,LibUV_jll)/include
-else
-  LIBUV_INCDIR = $(build_includedir)
-endif
 
 $(BUILDDIR)/pcre_h.jl: $(PCRE_INCDIR)/pcre2.h
 	@$(call PRINT_PERL, $(CPP) -D PCRE2_CODE_UNIT_WIDTH=8 -dM $< | perl -nle '/^\s*#define\s+PCRE2_(\w*)\s*\(?($(PCRE_CONST))\)?u?\s*$$/ and print "const $$1 = $$2 % UInt32"' | LC_ALL=C sort > $@)
@@ -35,7 +25,7 @@ $(BUILDDIR)/errno_h.jl:
 $(BUILDDIR)/file_constants.jl: $(SRCDIR)/../src/file_constants.h
 	@$(call PRINT_PERL, $(CPP_STDOUT) -DJULIA $< | perl -nle 'print "$$1 0o$$2" if /^(\s*const\s+[A-z_]+\s+=)\s+(0[0-9]*)\s*$$/; print "$$1" if /^\s*(const\s+[A-z_]+\s+=\s+([1-9]|0x)[0-9A-z]*)\s*$$/' > $@)
 
-$(BUILDDIR)/uv_constants.jl: $(SRCDIR)/../src/uv_constants.h $(LIBUV_INCDIR)/uv/errno.h
+$(BUILDDIR)/uv_constants.jl: $(SRCDIR)/../src/uv_constants.h $(LIBUV_INC)/uv/errno.h
 	@$(call PRINT_PERL, $(CPP_STDOUT) "-I$(LIBUV_INC)" -DJULIA $< | tail -n 16 > $@)
 
 $(BUILDDIR)/build_h.jl.phony:
@@ -67,7 +57,7 @@ ifeq ($(OS),WINNT)
 	@printf 'const LIBEXECDIR = "%s"\n' '$(subst /,\\,$(libexecdir_rel))' >> $@
 	@printf 'const PRIVATE_LIBDIR = "%s"\n' '$(subst /,\\,$(private_libdir_rel))' >> $@
 	@printf 'const INCLUDEDIR = "%s"\n' '$(subst /,\\,$(includedir_rel))' >> $@
-	@printf 'const PCRE_JLL_LIBDIR = "%s"\n' '$(subst /,\\,$(PCRE_JLL_LIBDIR_rel))' >> $@
+	@printf 'const PCRE_JLL_LIBDIR = "%s"\n' '$(subst /,\\,$(PCRE_LIBDIR_rel))' >> $@
 else
 	@echo "const SYSCONFDIR = \"$(sysconfdir_rel)\"" >> $@
 	@echo "const DATAROOTDIR = \"$(datarootdir_rel)\"" >> $@
@@ -76,7 +66,7 @@ else
 	@echo "const LIBEXECDIR = \"$(libexecdir_rel)\"" >> $@
 	@echo "const PRIVATE_LIBDIR = \"$(private_libdir_rel)\"" >> $@
 	@echo "const INCLUDEDIR = \"$(includedir_rel)\"" >> $@
-	@echo "const PCRE_JLL_LIBDIR = \"$(PCRE_JLL_LIBDIR_rel)\"" >> $@
+	@echo "const PCRE_JLL_LIBDIR = \"$(PCRE_LIBDIR_rel)\"" >> $@
 endif
 ifeq ($(DARWIN_FRAMEWORK), 1)
 	@echo "const DARWIN_FRAMEWORK = true" >> $@

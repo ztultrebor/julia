@@ -980,29 +980,25 @@ PYTHON_SYSTEM := $(shell $(PYTHON) -c 'from __future__ import print_function; im
 
 # If we're running on Cygwin, but using a native-windows Python, we need to use cygpath -w
 ifneq ($(and $(filter $(PYTHON_SYSTEM),Windows),$(findstring CYGWIN,$(BUILD_OS))),)
-define invoke_python
-$(PYTHON) `cygpath -w $(1)`
-endef
+python_cygpath = `cygpath -w $(1)`
 else
-define invoke_python
-$(PYTHON) "$(1)"
-endef
+python_cygpath = $(1)
 endif
 
 # BinaryBuilder options.  We default to "on" for all the projects listed in BB_PROJECTS,
 # but only if contrib/normalize_triplet.py works for our requested triplet.
-ifeq ($(shell $(call invoke_python,$(JULIAHOME)/contrib/normalize_triplet.py) $(or $(XC_HOST),$(XC_HOST),$(BUILD_MACHINE)) >/dev/null 2>/dev/null; echo $$?),0)
+ifeq ($(shell $(PYTHON) $(call python_cygpath,$(JULIAHOME)/contrib/normalize_triplet.py) $(or $(XC_HOST),$(XC_HOST),$(BUILD_MACHINE)) >/dev/null 2>/dev/null; echo $$?),0)
 USE_BINARYBUILDER ?= 1
 
 # Auto-detect triplet once, create different versions that we use as defaults below for each BB install target
-BB_TRIPLET_LIBGFORTRAN_CXXABI := $(shell $(call invoke_python,$(JULIAHOME)/contrib/normalize_triplet.py) $(or $(XC_HOST),$(XC_HOST),$(BUILD_MACHINE)) "$(shell $(FC) --version | head -1)" "$(or $(shell echo '\#include <string>' | $(CXX) $(CXXFLAGS) -x c++ -dM -E - | grep _GLIBCXX_USE_CXX11_ABI | awk '{ print $$3 }' ),1)")
+BB_TRIPLET_LIBGFORTRAN_CXXABI := $(shell $(PYTHON) $(call python_cygpath,$(JULIAHOME)/contrib/normalize_triplet.py) $(or $(XC_HOST),$(XC_HOST),$(BUILD_MACHINE)) "$(shell $(FC) --version | head -1)" "$(or $(shell echo '\#include <string>' | $(CXX) $(CXXFLAGS) -x c++ -dM -E - | grep _GLIBCXX_USE_CXX11_ABI | awk '{ print $$3 }' ),1)")
 
 # NABIL TODO: Get rid of these
 BB_TRIPLET_LIBGFORTRAN := $(subst $(SPACE),-,$(filter-out cxx%,$(subst -,$(SPACE),$(BB_TRIPLET_LIBGFORTRAN_CXXABI))))
 BB_TRIPLET_CXXABI := $(subst $(SPACE),-,$(filter-out libgfortran%,$(subst -,$(SPACE),$(BB_TRIPLET_LIBGFORTRAN_CXXABI))))
 BB_TRIPLET := $(subst $(SPACE),-,$(filter-out cxx%,$(filter-out libgfortran%,$(subst -,$(SPACE),$(BB_TRIPLET_LIBGFORTRAN_CXXABI)))))
 else
-ifneq ($(shell $(call invoke_python,$(JULIAHOME)/contrib/normalize_triplet.py) x86_64-linux-gnu),x86_64-linux-gnu)
+ifneq ($(shell $(PYTHON) $(call python_cygpath,$(JULIAHOME)/contrib/normalize_triplet.py) x86_64-linux-gnu),x86_64-linux-gnu)
 $(warning normalize_triplet.py appears to be non-functional (used python interpreter "$(PYTHON)"), so BinaryBuilder disabled)
 endif
 USE_BINARYBUILDER ?= 0
@@ -1047,12 +1043,13 @@ endef
 
 # Parse the treehash of a particular artifact for the current platform
 define artifact_treehash
-$(shell $(call invoke_python,$(JULIAHOME)/contrib/extract_artifact_info.py) $(call cygpath_w,$(build_datarootdir)/julia/stdlib/$(VERSDIR)/$(1)/Artifacts.toml) $(BB_TRIPLET_LIBGFORTRAN_CXXABI) 2>/dev/null | cut -d' ' -f1)
+$(shell $(PYTHON) $(call python_cygpath,$(JULIAHOME)/contrib/extract_artifact_info.py) $(call python_cygpath,$(build_datarootdir)/julia/stdlib/$(VERSDIR)/$(1)/Artifacts.toml) $(BB_TRIPLET_LIBGFORTRAN_CXXABI) | cut -d' ' -f1)
 endef
 
 # Find the directory an artifact will be unpacked into
 define find_jll
-$(build_datarootdir)/julia/artifacts/$(call artifact_treehash,$(1))
+$(1)_TREEHASH = $$(call artifact_treehash,$(1))
+$(1)_DIR = $(build_datarootdir)/julia/artifacts/$$(call hit_cache,$(1)_TREEHASH)
 endef
 
 # Get a path relative to the installed `bin` directory
@@ -1060,14 +1057,24 @@ define binrel_path
 $(shell $(JULIAHOME)/contrib/relative_path.sh "$(bindir)" "$(1)")
 endef
 
+# usage: $(call rewrite_dll_flag,libLLVM.dll,libLLVM_jll_DIR,$(build_bindir)/julia.exe)
+define rewrite_dll_flag
+--rewrite "$(1):$$($(JULIAHOME)/contrib/relative_path.sh $(build_bindir) $($(2))/$(binlib)/$(1))"
+endef
+# Build a rewrite rule for a library in a JLL.
+# Usage: $(call rewrite_dll_imports,$@,$(WINNT_REWRITE_LIBS))
+define rewrite_dll_imports
+$(PYTHON) $(call python_cygpath,$(JULIAHOME)/contrib/rewrite_imports.py) --verbose $(foreach pair,$(2),$(call rewrite_dll_flag,$(firstword $(subst :, ,$(pair))),$(lastword $(subst :, ,$(pair))),$(1))) $(call python_cygpath,$(1))
+endef
+
 ifeq ($(USE_SYSTEM_LIBUV), 1)
   LIBUV = $(LOCALBASE)/lib/libuv-julia.a
   LIBUV_INC = $(LOCALBASE)/include
 else
 ifeq ($(USE_BINARYBUILDER_LIBUV),1)
-  LIBUV_JLL_DIR = $(call find_jll,LibUV_jll)
-  LIBUV = $(call hit_cache,LIBUV_JLL_DIR)/lib/libuv.a
-  LIBUV_INC = $(call hit_cache,LIBUV_JLL_DIR)/include
+  $(eval $(call find_jll,LibUV_jll))
+  LIBUV = $(LibUV_jll_DIR)/lib/libuv.a
+  LIBUV_INC = $(LibUV_jll_DIR)/include
 else
   LIBUV = $(build_libdir)/libuv.a
   LIBUV_INC = $(build_includedir)
@@ -1080,12 +1087,14 @@ ifeq ($(USE_SYSTEM_PCRE), 1)
   PCRE_INCDIR = $(call hit_cache,PCRE_INCDIR_ASK)
 else
 ifeq ($(USE_BINARYBUILDER_PCRE),1)
-  PCRE_JLL_DIR = $(call find_jll,PCRE2_jll)
-  PCRE_CONFIG = $(call hit_cache,PCRE_JLL_DIR)/bin/pcre2-config$(EXE)
-  PCRE_INCDIR = $(call hit_cache,PCRE_JLL_DIR)/include
+  $(eval $(call find_jll,PCRE2_jll))
+  PCRE_CONFIG = $(PCRE2_jll_DIR)/bin/pcre2-config$(EXE)
+  PCRE_INCDIR = $(PCRE2_jll_DIR)/include
+  PCRE_LIBDIR_rel = $(call binrel_path,$(PCRE2_jll_DIR)/${binlib})
 else
   PCRE_CONFIG = $(build_depsbindir)/pcre2-config$(EXE)
   PCRE_INCDIR = $(build_includedir)
+  PCRE_LIBDIR_rel = $(build_libdir_rel)
 endif
 endif
 
@@ -1094,9 +1103,9 @@ ifeq ($(USE_SYSTEM_UTF8PROC), 1)
   UTF8PROC_INC = $(LOCALBASE)/include
 else
 ifeq ($(USE_BINARYBUILDER_UTF8PROC),1)
-  LIBUTF8PROC_JLL_DIR = $(call find_jll,utf8proc_jll)
-  LIBUTF8PROC = $(call hit_cache,LIBUTF8PROC_JLL_DIR)/lib/libutf8proc.a
-  UTF8PROC_INC = $(call hit_cache,LIBUTF8PROC_JLL_DIR)/include
+  $(eval $(call find_jll,utf8proc_jll))
+  LIBUTF8PROC = $(utf8proc_jll_DIR)/lib/libutf8proc.a
+  UTF8PROC_INC = $(utf8proc_jll_DIR)/include
 else
   LIBUTF8PROC = $(build_libdir)/libutf8proc.a
   UTF8PROC_INC = $(build_includedir)
@@ -1108,8 +1117,8 @@ ifeq ($(USE_SYSTEM_LIBM), 1)
   LIBMNAME := libm
 else
 ifeq ($(USE_BINARYBUILDER_OPENLIBM),1)
-  OPENLIBM_JLL_DIR = $(call find_jll,OpenLibm_jll)
-  OPENLIBM = $(call hit_cache,OPENLIBM_JLL_DIR)/lib/libopenlibm.a
+  $(eval $(call find_jll,OpenLibm_jll))
+  OPENLIBM = $(OpenLibm_jll_DIR)/lib/libopenlibm.a
 else
   OPENLIBM = $(build_libdir)/libopenlibm.a
 endif
@@ -1132,7 +1141,6 @@ ifneq ($(OS),Darwin)
   JCFLAGS+=-DSYSTEM_LIBUNWIND
   JCPPFLAGS+=-DSYSTEM_LIBUNWIND
 endif # $(OS) != Darwin
-
 else # USE_SYSTEM_LIBUNWIND
 # If we're using BB unwind, choose the JLL name here:
 ifeq ($(OS),Darwin)
@@ -1143,9 +1151,9 @@ else
 endif # $(OS) == Darwin
 
 ifeq ($(USE_BINARYBUILDER_LIBUNWIND),1)
-  LIBUNWIND_JLL_DIR = $(call find_jll,$(LIBUNWIND_JLL_NAME))
-  LIBUNWIND = $(call hit_cache,LIBUNWIND_JLL_DIR)/lib/$(firstword $(subst _, ,$(call lowercase,$(LIBUNWIND_JLL_NAME)))).a
-  LIBUNWIND_INC = $(call hit_cache,LIBUNWIND_JLL_DIR)/include
+  $(eval $(call find_jll,$(LIBUNWIND_JLL_NAME)))
+  LIBUNWIND = $($(LIBUNWIND_JLL_NAME)_DIR)/lib/$(firstword $(subst _, ,$(call lowercase,$(LIBUNWIND_JLL_NAME)))).a
+  LIBUNWIND_INC = $($(LIBUNWIND_JLL_NAME)_DIR)/include
 else
 ifeq ($(OS),Darwin)
   LIBUNWIND = $(build_libdir)/libosxunwind.a
@@ -1158,23 +1166,36 @@ endif # $(USE_BINARYBUILDER_LIBUNWIND)
 endif # $(USE_SYSTEM_LIBUNWIND)
 endif # $(OS) == WINNT
 
+
 ifeq ($(USE_BINARYBUILDER_CSL),1)
-CSL_JLL_DIR = $(call find_jll,CompilerSupportLibraries_jll)
-CSL_SHLIBDIR = $(call hit_cache,CSL_JLL_DIR)/$(binlib)
+$(eval $(call find_jll,CompilerSupportLibraries_jll))
+CSL_SHLIBDIR = $(CompilerSupportLibraries_jll_DIR)/$(binlib)
+
+# Add a few CSL libraries onto the list of rewrite targets
+WINNT_REWRITE_LIBS += libgcc_s_seh-1.dll:CompilerSupportLibraries_jll_DIR
+WINNT_REWRITE_LIBS += libssp-0.dll:CompilerSupportLibraries_jll_DIR
+WINNT_REWRITE_LIBS += libstdc++-6.dll:CompilerSupportLibraries_jll_DIR
+WINNT_REWRITE_LIBS += libwinpthread-1.dll:CompilerSupportLibraries_jll_DIR
 endif
+
 
 ifeq ($(origin LLVM_CONFIG), undefined)
 ifeq ($(USE_SYSTEM_LLVM), 1)
   LLVM_CONFIG = llvm-config$(EXE)
 else
 ifeq ($(USE_BINARYBUILDER_LLVM),1)
-  LLVM_JLL_DIR = $(call find_jll,libLLVM_jll)
-  LLVM_CONFIG = $(call hit_cache,LLVM_JLL_DIR)/tools/llvm-config$(EXE)
+  $(eval $(call find_jll,libLLVM_jll))
+  LLVM_SHLIBDIR = $(libLLVM_jll_DIR)/$(binlib)
+  LLVM_CONFIG = $(libLLVM_jll_DIR)/tools/llvm-config$(EXE)
+
+  # Add both LLVM.dll and libLLVM.dll onto the list of rewrite targets
+  WINNT_REWRITE_LIBS += LLVM.dll:libLLVM_jll_DIR
+  WINNT_REWRITE_LIBS += libLLVM.dll:libLLVM_jll_DIR
 
 # If we're on windows/cygwin, llvm-config-host.exe won't have an
 # RPATH and may require some help finding its supporting libraries:
 ifneq (,$(findstring CYGWIN,$(BUILD_OS))$(findstring WINNT,$(BUILD_OS)))
-  LLVM_CONFIG_HOST_PATH_ADJUST = PATH=$$PATH:$(call hit_cache,LLVM_JLL_DIR)/bin:$(CSL_SHLIBDIR)
+  LLVM_CONFIG_HOST_PATH_ADJUST = PATH=$$PATH:$(libLLVM_jll_DIR)/bin:$(CSL_SHLIBDIR)
 endif
 else
   LLVM_CONFIG = $(build_depsbindir)/llvm-config$(EXE)
@@ -1195,9 +1216,6 @@ ifneq (exists, $(shell [ -f '$(LLVM_CONFIG_HOST)' ] && echo exists ))
   LLVM_CONFIG_HOST = $(LLVM_CONFIG_HOST_PATH_ADJUST) $(call spawn,$(LLVM_CONFIG))
 endif
 endif
-
-# Use the LLVM Assertions build
-BINARYBUILDER_LLVM_ASSERTS ?= 0
 
 
 # install_name_tool

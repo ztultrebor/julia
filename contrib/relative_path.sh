@@ -3,6 +3,8 @@
 
 # both $1 and $2 are absolute paths beginning with /
 # returns relative path to $2/$target from $1/$source
+# if the relative path to $2 would just be its basename, return `./$2`
+# that is, the result always includes a directory component.
 
 relpath () {
     [ $# -ge 1 ] && [ $# -le 2 ] || return 1
@@ -26,6 +28,8 @@ relpath () {
         relative="$relative${relative:+/}.."
     done
     relative="$relative${relative:+${appendix:+/}}${appendix#/}"
-    echo "$relative"
+    echo "relative: ${relative}" >&2
+    [ "`basename "${relative}"`" != "${relative}" ] || relative="./${relative}"
+    echo "${relative}"
 }
 relpath "$@"
