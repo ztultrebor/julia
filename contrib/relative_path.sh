@@ -28,7 +28,6 @@ relpath () {
         relative="$relative${relative:+/}.."
     done
     relative="$relative${relative:+${appendix:+/}}${appendix#/}"
-    echo "relative: ${relative}" >&2
     [ "`basename "${relative}"`" != "${relative}" ] || relative="./${relative}"
     echo "${relative}"
 }
