@@ -1,4 +1,6 @@
-import toml, sys, os
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendored"))
+import toml
 
 artifacts_toml = sys.argv[1]
 platform_triplet = sys.argv[2]
