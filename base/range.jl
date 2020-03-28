@@ -142,9 +142,6 @@ Supertype for ranges with elements of type `T`.
 """
 abstract type AbstractRange{T} <: AbstractArray{T,1} end
 
-RangeStepStyle(::Type{<:AbstractRange}) = RangeStepIrregular()
-RangeStepStyle(::Type{<:AbstractRange{<:Integer}}) = RangeStepRegular()
-
 convert(::Type{T}, r::AbstractRange) where {T<:AbstractRange} = r isa T ? r : T(r)
 
 ## ordinal ranges

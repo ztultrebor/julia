@@ -61,7 +61,3 @@ Base.iterate(r::StepRange{<:TimeType}, (l, i)) = l <= i ? nothing : (r.start + r
 *(x::Period, r::AbstractRange{<:Real}) = (x * first(r)):(x * step(r)):(x * last(r))
 *(r::AbstractRange{<:Real}, x::Period) = x * r
 /(r::AbstractRange{<:P}, x::P) where {P<:Period} = (first(r)/x):(step(r)/x):(last(r)/x)
-
-# Combinations of types and periods for which the range step is regular
-Base.RangeStepStyle(::Type{<:OrdinalRange{<:TimeType, <:FixedPeriod}}) =
-    Base.RangeStepRegular()
