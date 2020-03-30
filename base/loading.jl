@@ -1083,7 +1083,7 @@ actually evaluates `mapexpr(expr)`.  If it is omitted, `mapexpr` defaults to [`i
 """
 function include_string(mapexpr::Function, m::Module, txt_::AbstractString, fname::AbstractString="string")
     txt = String(txt_)
-    ccall(:jl_load_rewrite_file_string, Any, (Any, Any, Any, Any),
+    ccall(:jl_parse_eval_all, Any, (Any, Any, Any, Any),
           m, txt, String(fname), mapexpr === identity ? nothing : mapexpr)
 end
 

@@ -869,19 +869,75 @@ JL_DLLEXPORT jl_value_t *jl_infer_thunk(jl_code_info_t *thk, jl_module_t *m)
 //------------------------------------------------------------------------------
 // Code loading: combined parse+eval for include() and include_string()
 
-// Parse julia code from the string `text`, attributing it to `filename`. Eval
-// the resulting statements into `module` after applying `mapexpr` to each one
-// (if not one of NULL or nothing).
-JL_DLLEXPORT jl_value_t *jl_load_rewrite_file_string(jl_module_t *module,
-                                                     jl_value_t *text,
-                                                     jl_value_t *filename,
-                                                     jl_value_t *mapexpr)
+// Parse julia code from the string `text` at top level, attributing it to
+// `filename`. Each resulting top level expression is optionally transformed by
+// `mapexpr` (if not nothing) before being lowered and evaluated in module
+// `module`.
+JL_DLLEXPORT jl_value_t *jl_parse_eval_all(jl_module_t *module, jl_value_t *text,
+                                           jl_value_t *filename, jl_value_t *mapexpr)
 {
     if (!jl_is_string(text) || !jl_is_string(filename)) {
         jl_errorf("Expected `String`s for `text` and `filename`");
     }
-    return jl_parse_eval_all(module, text, filename,
-                             mapexpr == jl_nothing ? NULL : mapexpr);
+    jl_ptls_t ptls = jl_get_ptls_states();
+    if (ptls->in_pure_callback)
+        jl_error("cannot use include inside a generated function");
+
+    jl_value_t *result = jl_nothing;
+    jl_value_t *ast = NULL;
+    jl_value_t *expression = NULL;
+    JL_GC_PUSH3(&ast, &result, &expression);
+
+    ast = jl_parse_all(jl_string_data(text), jl_string_len(text),
+                       jl_string_data(filename), jl_string_len(filename));
+    if (!jl_is_expr(ast) || ((jl_expr_t*)ast)->head != toplevel_sym) {
+        jl_errorf("jl_parse_all() must generate a top level expression");
+    }
+
+    int last_lineno = jl_lineno;
+    const char *last_filename = jl_filename;
+    size_t last_age = jl_get_ptls_states()->world_age;
+    int lineno = 0;
+    jl_lineno = 0;
+    jl_filename = jl_string_data(filename);
+    int err = 0;
+
+    JL_TRY {
+        for (size_t i = 0; i < jl_expr_nargs(ast); i++) {
+            expression = jl_exprarg(ast, i);
+            if (jl_is_linenode(expression)) {
+                // filename is already set above.
+                lineno = jl_linenode_line(expression);
+                jl_lineno = lineno;
+                continue;
+            }
+            if (mapexpr != jl_nothing) {
+                expression = jl_call1(mapexpr, expression);
+            }
+            expression = jl_expand_with_loc_warn(expression, module,
+                                                 jl_string_data(filename), lineno);
+            jl_get_ptls_states()->world_age = jl_world_counter;
+            result = jl_toplevel_eval_flex(module, expression, 1, 1);
+        }
+    }
+    JL_CATCH {
+        result = jl_box_long(jl_lineno); // (ab)use result to root error line
+        err = 1;
+        goto finally; // skip jl_restore_excstack
+    }
+finally:
+    jl_get_ptls_states()->world_age = last_age;
+    jl_lineno = last_lineno;
+    jl_filename = last_filename;
+    if (err) {
+        if (jl_loaderror_type == NULL)
+            jl_rethrow();
+        else
+            jl_rethrow_other(jl_new_struct(jl_loaderror_type, filename, result,
+                                           jl_current_exception()));
+    }
+    JL_GC_POP();
+    return result;
 }
 
 // Synchronously read content of entire file into a julia String
@@ -910,7 +966,7 @@ JL_DLLEXPORT jl_value_t *jl_load_rewrite(jl_module_t *module,
 {
     jl_value_t *text = jl_file_content_as_string(filename);
     JL_GC_PUSH1(&text);
-    jl_value_t *result = jl_load_rewrite_file_string(module, text, filename, mapexpr);
+    jl_value_t *result = jl_parse_eval_all(module, text, filename, mapexpr);
     JL_GC_POP();
     return result;
 }
@@ -938,7 +994,7 @@ JL_DLLEXPORT jl_value_t *jl_load_file_string(const char *text, size_t len,
     JL_GC_PUSH2(&text_, &filename_);
     text_ = jl_pchar_to_string(text, len);
     filename_ = jl_cstr_to_string(filename);
-    jl_value_t *result = jl_load_rewrite_file_string(module, text_, filename_, jl_nothing);
+    jl_value_t *result = jl_parse_eval_all(module, text_, filename_, jl_nothing);
     JL_GC_POP();
     return result;
 }

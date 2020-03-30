@@ -783,6 +783,8 @@ typedef enum {
     JL_PARSE_TOPLEVEL   = 3,
 } jl_parse_rule_t;
 
+// Parse string `content` starting at byte offset `start_pos` attributing it to
+// `filename`. Return an svec of (parse_result, final_pos)
 JL_DLLEXPORT jl_value_t *jl_fl_parse(const char *content, size_t content_len,
                                      const char *filename, size_t filename_len,
                                      int start_pos, jl_parse_rule_t rule)
@@ -854,113 +856,6 @@ JL_DLLEXPORT jl_value_t *jl_parse_input_line(const char *str, size_t len,
                                              const char *filename, size_t filename_len)
 {
     return jl_parse_all(str, len, filename, filename_len);
-}
-
-// Parse a string `text` at top level, attributing source locations to
-// `filename`. Each expression is optionally modified by `mapexpr` (if
-// non-NULL) before evaluating in module `inmodule`.
-jl_value_t *jl_parse_eval_all(jl_module_t *inmodule, jl_value_t *text,
-                              jl_value_t *filename, jl_value_t *mapexpr)
-{
-    jl_ptls_t ptls = jl_get_ptls_states();
-    if (ptls->in_pure_callback)
-        jl_error("cannot use include inside a generated function");
-    jl_ast_context_t *ctx = jl_ast_ctx_enter();
-    fl_context_t *fl_ctx = &ctx->fl;
-    value_t f, ast, expression;
-    f = cvalue_static_cstrn(fl_ctx, jl_string_data(filename), jl_string_len(filename));
-    fl_gc_handle(fl_ctx, &f);
-    {
-        JL_TIMING(PARSING);
-        value_t t = cvalue_static_cstrn(fl_ctx, jl_string_data(text),
-                                        jl_string_len(text));
-        fl_gc_handle(fl_ctx, &t);
-        ast = fl_applyn(fl_ctx, 2, symbol_value(symbol(fl_ctx, "jl-parse-all")), t, f);
-        fl_free_gc_handles(fl_ctx, 1);
-    }
-    fl_free_gc_handles(fl_ctx, 1);
-    if (ast == fl_ctx->F) {
-        jl_ast_ctx_leave(ctx);
-        jl_errorf("could not open file %s", jl_string_data(filename));
-    }
-    fl_gc_handle(fl_ctx, &ast);
-    fl_gc_handle(fl_ctx, &expression);
-
-    int last_lineno = jl_lineno;
-    const char *last_filename = jl_filename;
-    size_t last_age = jl_get_ptls_states()->world_age;
-    int lineno = 0;
-    jl_lineno = 0;
-    jl_filename = jl_string_data(filename);
-    jl_module_t *old_module = ctx->module;
-    ctx->module = inmodule;
-    jl_value_t *form = NULL;
-    jl_value_t *result = jl_nothing;
-    int err = 0;
-    JL_GC_PUSH2(&form, &result);
-    JL_TRY {
-        assert(iscons(ast) && car_(ast) == symbol(fl_ctx, "toplevel"));
-        ast = cdr_(ast);
-        while (iscons(ast)) {
-            expression = car_(ast);
-            {
-                JL_TIMING(LOWERING);
-                if (fl_ctx->T == fl_applyn(fl_ctx, 1, symbol_value(symbol(fl_ctx, "contains-macrocall")), expression)) {
-                    form = scm_to_julia(fl_ctx, expression, inmodule);
-                    if (mapexpr)
-                        form = jl_call1(mapexpr, form);
-                    form = jl_expand_macros(form, inmodule, NULL, 0);
-                    expression = julia_to_scm(fl_ctx, form);
-                }
-                else if (mapexpr) {
-                    form = scm_to_julia(fl_ctx, expression, inmodule);
-                    form = jl_call1(mapexpr, form);
-                    expression = julia_to_scm(fl_ctx, form);
-                }
-                // expand non-final expressions in statement position (value unused)
-                expression =
-                    fl_applyn(fl_ctx, 4,
-                              symbol_value(symbol(fl_ctx, "jl-expand-to-thunk-warn")),
-                              expression, symbol(fl_ctx, jl_string_data(filename)),
-                              fixnum(lineno), iscons(cdr_(ast)) ? fl_ctx->T : fl_ctx->F);
-            }
-            jl_get_ptls_states()->world_age = jl_world_counter;
-            form = scm_to_julia(fl_ctx, expression, inmodule);
-            JL_SIGATOMIC_END();
-            jl_get_ptls_states()->world_age = jl_world_counter;
-            if (jl_is_linenode(form)) {
-                lineno = jl_linenode_line(form);
-                jl_lineno = lineno;
-            }
-            else {
-                result = jl_toplevel_eval_flex(inmodule, form, 1, 1);
-            }
-            JL_SIGATOMIC_BEGIN();
-            ast = cdr_(ast);
-        }
-    }
-    JL_CATCH {
-        form = filename;
-        result = jl_box_long(jl_lineno);
-        err = 1;
-        goto finally; // skip jl_restore_excstack
-    }
-finally:
-    jl_get_ptls_states()->world_age = last_age;
-    jl_lineno = last_lineno;
-    jl_filename = last_filename;
-    fl_free_gc_handles(fl_ctx, 2);
-    ctx->module = old_module;
-    jl_ast_ctx_leave(ctx);
-    if (err) {
-        if (jl_loaderror_type == NULL)
-            jl_rethrow();
-        else
-            jl_rethrow_other(jl_new_struct(jl_loaderror_type, form, result,
-                                           jl_current_exception()));
-    }
-    JL_GC_POP();
-    return result;
 }
 
 // returns either an expression or a thunk
