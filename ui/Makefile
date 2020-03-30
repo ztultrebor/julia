@@ -31,6 +31,10 @@ JLDFLAGS += $(WHOLE_ARCHIVE) $(OPENLIBM) $(NO_WHOLE_ARCHIVE)
 endif
 endif
 
+ifeq ($(USE_BINARYBUILDER_LLVM),1)
+JLDFLAGS += $(call rpath_rel_link,$(call cygpath,$(shell $(LLVM_CONFIG_HOST) --libdir)))
+endif
+
 ifeq ($(OS),WINNT)
 JLDFLAGS += -municode
 endif
