@@ -330,9 +330,6 @@ ifneq ($(OS), WINNT)
 	@ln -sf libjulia-debug.$(JL_MAJOR_MINOR_SHLIB_EXT) $(build_shlibdir)/libjulia-debug.$(SHLIB_EXT)
 endif
 	$(DSYMUTIL) $@
-ifeq ($(OS), WINNT)
-	$(call rewrite_dll_imports,$@,$(WINNT_REWRITE_LIBS))
-endif
 
 $(BUILDDIR)/libjulia-debug.a: $(SRCDIR)/julia.expmap $(DOBJS) $(BUILDDIR)/flisp/libflisp-debug.a $(BUILDDIR)/support/libsupport-debug.a
 	rm -f $@
@@ -348,9 +345,6 @@ ifneq ($(OS), WINNT)
 	@ln -sf libjulia.$(JL_MAJOR_MINOR_SHLIB_EXT) $(build_shlibdir)/libjulia.$(SHLIB_EXT)
 endif
 	$(DSYMUTIL) $@
-ifeq ($(OS), WINNT)
-	$(call rewrite_dll_imports,$@,$(WINNT_REWRITE_LIBS))
-endif
 
 
 $(BUILDDIR)/libjulia.a: julia.expmap $(OBJS) $(BUILDDIR)/flisp/libflisp.a $(BUILDDIR)/support/libsupport.a

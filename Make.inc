@@ -397,6 +397,7 @@ endif
 ifeq ($(OS), WINNT)
 fPIC :=
 EXE := .exe
+CMD := .cmd
 else
 fPIC := -fPIC
 EXE :=
@@ -1524,8 +1525,8 @@ JULIA_BUILD_MODE := debug
 endif
 endif
 
-JULIA_EXECUTABLE_debug := $(build_bindir)/julia-debug$(EXE)
-JULIA_EXECUTABLE_release := $(build_bindir)/julia$(EXE)
+JULIA_EXECUTABLE_debug := $(build_bindir)/julia-debug$(CMD)
+JULIA_EXECUTABLE_release := $(build_bindir)/julia$(CMD)
 JULIA_EXECUTABLE := $(JULIA_EXECUTABLE_$(JULIA_BUILD_MODE))
 
 JULIA_SYSIMG_debug := $(build_private_libdir)/sys-debug.$(SHLIB_EXT)

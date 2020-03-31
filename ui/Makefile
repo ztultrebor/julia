@@ -86,17 +86,24 @@ else
 CXXLD := $(LD)
 endif
 
+# Add `.cmd` wrapper generation to properly setup `PATH` on windows
+ifeq ($(OS),WINNT)
+$(build_bindir)/%.cmd: $(build_bindir)/$*$(EXE)
+	@echo "@echo off" > $@
+	@echo "set PATH=%PATH%;%~dp0\\$(call binrel_path,$(CSL_SHLIBDIR));%~dp0\\$(call binrel_path,$(LLVM_SHLIBDIR))" >> $@
+	@echo "\"%~dp0\"\\$*.exe %*" >> $@
+	@chmod a+x $@
+
+julia-release: $(build_bindir)/julia.cmd
+julia-debug: $(build_bindir)/julia-debug.cmd
+endif
+
+
 $(build_bindir)/julia$(EXE): $(OBJS)
 	@$(call PRINT_LINK, $(CXXLD) $(CXXFLAGS) $(CXXLDFLAGS) $(LINK_FLAGS) $(SHIPFLAGS) $(OBJS) -o $@ -L$(build_private_libdir) -L$(build_libdir) -L$(build_shlibdir) -ljulia $(JLDFLAGS) $(CXXLDFLAGS))
-ifeq ($(OS), WINNT)
-	$(call rewrite_dll_imports,$@,$(WINNT_REWRITE_LIBS))
-endif
 
 $(build_bindir)/julia-debug$(EXE): $(DOBJS)
 	@$(call PRINT_LINK, $(CXXLD) $(CXXFLAGS) $(CXXLDFLAGS) $(LINK_FLAGS) $(DEBUGFLAGS) $(DOBJS) -o $@ -L$(build_private_libdir) -L$(build_libdir) -L$(build_shlibdir) -ljulia-debug $(JLDFLAGS) $(CXXLDFLAGS))
-ifeq ($(OS), WINNT)
-	$(call rewrite_dll_imports,$@,$(WINNT_REWRITE_LIBS))
-endif
 
 clean: | $(CLEAN_TARGETS)
 	rm -f *.o *.dbg.obj

@@ -518,14 +518,3 @@ $(eval $(call install-jll-and-artifact,libLLVM_jll))
 $(eval $(call fix-artifact-naming-mismatch,llvm,libLLVM_jll))
 
 endif # USE_BINARYBUILDER_LLVM
-
-# Because LLVM is a critical piece of infrastructure for us, we need to load it at julia.exe
-# dynamic-link time.  On windows, that means that we need it to be able to find its deps, but
-# since we don't have an RPATH, we have to manually mcjigger the PE file import descriptors:
-ifeq ($(OS),WINNT)
-rewrite-libllvm: $(build_prefix)/manifest/libLLVM_jll rewrite-compilersupportlibraries
-	@for f in $(libLLVM_jll_DIR)/$(binlib)/*.$(SHLIB_EXT); do \
-		$(call rewrite_dll_imports,$$f,$(WINNT_REWRITE_LIBS)); \
-	done
-install-llvm: rewrite-libllvm
-endif
