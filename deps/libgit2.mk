@@ -12,10 +12,8 @@ ifeq ($(USE_SYSTEM_MBEDTLS), 0)
 $(BUILDDIR)/$(LIBGIT2_SRC_DIR)/build-configured: | $(build_prefix)/manifest/mbedtls
 endif
 
-ifneq ($(OS),WINNT)
 ifeq ($(USE_SYSTEM_CURL), 0)
 $(BUILDDIR)/$(LIBGIT2_SRC_DIR)/build-configured: | $(build_prefix)/manifest/curl
-endif
 endif
 
 ifneq ($(USE_BINARYBUILDER_LIBGIT2),1)
