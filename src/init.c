@@ -734,6 +734,7 @@ void _julia_init(JL_IMAGE_SEARCH rel)
 #endif
     jl_init_common_symbols();
     jl_init_flisp();
+    jl_set_parser(jl_fl_parse);
     jl_init_serializer();
 
     if (!jl_options.image_file) {

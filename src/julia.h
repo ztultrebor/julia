@@ -1597,7 +1597,16 @@ JL_DLLEXPORT jl_value_t *jl_restore_incremental(const char *fname, jl_array_t *d
 JL_DLLEXPORT jl_value_t *jl_restore_incremental_from_buf(const char *buf, size_t sz, jl_array_t *depmods);
 
 // front end interface
+typedef enum {
+    JL_PARSE_ATOM      = 1,
+    JL_PARSE_STATEMENT = 2,
+    JL_PARSE_TOPLEVEL  = 3,
+} jl_parse_rule_t;
+
 // parsing
+JL_DLLEXPORT jl_value_t *jl_parse(jl_value_t *text, jl_value_t *filename,
+                                  int start_pos, int rule);
+// TODO: Deprecate or convert to passing String to the next two?
 JL_DLLEXPORT jl_value_t *jl_parse_all(const char *str, size_t len,
                                       const char *filename, size_t filename_len);
 JL_DLLEXPORT jl_value_t *jl_parse_string(const char *str, size_t len,
@@ -1611,7 +1620,7 @@ JL_DLLEXPORT jl_value_t *jl_expand_with_loc_warn(jl_value_t *expr, jl_module_t *
 JL_DLLEXPORT jl_value_t *jl_expand_stmt(jl_value_t *expr, jl_module_t *inmodule);
 JL_DLLEXPORT jl_value_t *jl_expand_stmt_with_loc(jl_value_t *expr, jl_module_t *inmodule,
                                                  const char *file, int line);
-// deprecated; use jl_parse_all
+// deprecated; use jl_parse
 JL_DLLEXPORT jl_value_t *jl_parse_input_line(const char *str, size_t len,
                                              const char *filename, size_t filename_len);
 

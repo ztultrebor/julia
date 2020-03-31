@@ -27,6 +27,8 @@ extern "C" {
 #pragma warning(disable:4335)
 #endif
 
+// TODO: Move non-flisp stuff into frontend.c (symbol init + macro expansion etc)
+
 // head symbols for each expression type
 jl_sym_t *call_sym;    jl_sym_t *invoke_sym;
 jl_sym_t *empty_sym;   jl_sym_t *top_sym;
@@ -777,85 +779,59 @@ static value_t julia_to_scm_(fl_context_t *fl_ctx, jl_value_t *v)
     return julia_to_scm_noalloc2(fl_ctx, v);
 }
 
-typedef enum {
-    JL_PARSE_ATOM       = 1,
-    JL_PARSE_STATEMENTS = 2,
-    JL_PARSE_TOPLEVEL   = 3,
-} jl_parse_rule_t;
-
-// Parse string `content` starting at byte offset `start_pos` attributing it to
-// `filename`. Return an svec of (parse_result, final_pos)
-JL_DLLEXPORT jl_value_t *jl_fl_parse(const char *content, size_t content_len,
-                                     const char *filename, size_t filename_len,
-                                     int start_pos, jl_parse_rule_t rule)
+// Parse string `content` starting at 1-based index `start_pos` attributing the
+// content to `filename`. Return an svec of (parse_result, final_pos)
+JL_DLLEXPORT jl_value_t *jl_fl_parse(jl_value_t *text, jl_value_t *filename,
+                                     int start_pos, int rule)
 {
     JL_TIMING(PARSING);
-    if (start_pos < 0 || start_pos > content_len) {
-        jl_array_t *buf = jl_pchar_to_array(content, content_len);
-        JL_GC_PUSH1(&buf);
-        // jl_bounds_error roots the arguments.
-        jl_bounds_error((jl_value_t*)buf, jl_box_long(start_pos));
+    if (!jl_is_string(text) || !jl_is_string(filename)) {
+        jl_errorf("File content and name must be Strings");
     }
-    else if (start_pos != 0 && rule == JL_PARSE_TOPLEVEL) {
+    if (start_pos < 1 || start_pos > (int)jl_string_len(text) + 1) {
+        // jl_bounds_error roots the arguments.
+        jl_bounds_error(jl_box_long(start_pos), text);
+    }
+    else if (start_pos != 1 && rule == JL_PARSE_TOPLEVEL) {
         jl_error("Partial parsing not support by top level grammar rule");
     }
-    jl_value_t *expr=NULL, *pos1=NULL;
-    JL_GC_PUSH2(&expr, &pos1);
 
-    // Call into flisp
     jl_ast_context_t *ctx = jl_ast_ctx_enter();
     fl_context_t *fl_ctx = &ctx->fl;
-    value_t fl_content = cvalue_static_cstrn(fl_ctx, content, content_len);
-    value_t fl_filename = cvalue_static_cstrn(fl_ctx, filename, filename_len);
+    value_t fl_text = cvalue_static_cstrn(fl_ctx, jl_string_data(text),
+                                          jl_string_len(text));
+    value_t fl_filename = cvalue_static_cstrn(fl_ctx, jl_string_data(filename),
+                                              jl_string_len(filename));
+    value_t fl_expr;
+    size_t pos1 = 0;
     if (rule == JL_PARSE_TOPLEVEL) {
         value_t e = fl_applyn(fl_ctx, 2, symbol_value(symbol(fl_ctx, "jl-parse-all")),
-                              fl_content, fl_filename);
-        expr = e == fl_ctx->FL_EOF ? jl_nothing : scm_to_julia(fl_ctx, e, NULL);
-        pos1 = e == fl_ctx->FL_EOF ? jl_box_long(content_len) : jl_box_long(0);
+                              fl_text, fl_filename);
+        fl_expr = e;
+        pos1 = e == fl_ctx->FL_EOF ? jl_string_len(text) : 0;
     }
-    else if (rule == JL_PARSE_STATEMENTS || rule == JL_PARSE_ATOM) {
-        value_t greedy = rule == JL_PARSE_STATEMENTS ?
-                         fl_ctx->T : fl_ctx->F;
+    else if (rule == JL_PARSE_STATEMENT || rule == JL_PARSE_ATOM) {
+        value_t greedy = rule == JL_PARSE_STATEMENT ? fl_ctx->T : fl_ctx->F;
+        value_t offset = fixnum(start_pos-1);
         value_t p = fl_applyn(fl_ctx, 4, symbol_value(symbol(fl_ctx, "jl-parse-one")),
-                              fl_content, fl_filename, fixnum(start_pos), greedy);
-        value_t e = car_(p);
-        expr = e == fl_ctx->FL_EOF ? jl_nothing : scm_to_julia(fl_ctx, e, NULL);
-        pos1 = jl_box_long(tosize(fl_ctx, cdr_(p), "parse"));
+                              fl_text, fl_filename, offset, greedy);
+        fl_expr = car_(p);
+        pos1 = tosize(fl_ctx, cdr_(p), "parse");
     }
+    else {
+        jl_ast_ctx_leave(ctx);
+        jl_errorf("Unknown parse rule %d", (int)rule);
+    }
+
+    // Convert to julia values
+    jl_value_t *expr=NULL, *end_pos=NULL;
+    JL_GC_PUSH2(&expr, &end_pos);
+    expr = fl_expr == fl_ctx->FL_EOF ? jl_nothing : scm_to_julia(fl_ctx, fl_expr, NULL);
+    end_pos = jl_box_long(pos1 + 1);
     jl_ast_ctx_leave(ctx);
-
-    if (expr == NULL) {
-        jl_errorf("Unknown grammar rule %d", (int)rule);
-    }
-
-    jl_value_t *result = (jl_value_t*)jl_svec2(expr, pos1);
+    jl_value_t *result = (jl_value_t*)jl_svec2(expr, end_pos);
     JL_GC_POP();
     return result;
-}
-
-// parse an entire string like a file, reading multiple expressions
-JL_DLLEXPORT jl_value_t *jl_parse_all(const char *str, size_t len,
-                                      const char *filename, size_t filename_len)
-{
-    jl_value_t *p = jl_fl_parse(str, len, filename, filename_len,
-                                0, JL_PARSE_TOPLEVEL);
-    return jl_svecref(p, 0);
-}
-
-// this is for parsing one expression out of a string, keeping track of
-// the current position.
-JL_DLLEXPORT jl_value_t *jl_parse_string(const char *str, size_t len,
-                                         int pos0, int greedy)
-{
-    return jl_fl_parse(str, len, "none", 4, pos0,
-                       greedy ? JL_PARSE_STATEMENTS : JL_PARSE_ATOM);
-}
-
-// deprecated
-JL_DLLEXPORT jl_value_t *jl_parse_input_line(const char *str, size_t len,
-                                             const char *filename, size_t filename_len)
-{
-    return jl_parse_all(str, len, filename, filename_len);
 }
 
 // returns either an expression or a thunk
