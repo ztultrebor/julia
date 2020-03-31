@@ -88,7 +88,7 @@ endif
 
 # Add `.cmd` wrapper generation to properly setup `PATH` on windows
 ifeq ($(OS),WINNT)
-$(build_bindir)/%.cmd: $(build_bindir)/$*$(EXE)
+$(build_bindir)/%.cmd:
 	@echo "@echo off" > $@
 	@echo "set PATH=%PATH%;%~dp0\\$(call binrel_path,$(CSL_SHLIBDIR));%~dp0\\$(call binrel_path,$(LLVM_SHLIBDIR))" >> $@
 	@echo "\"%~dp0\"\\$*.exe %*" >> $@
