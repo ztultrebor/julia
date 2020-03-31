@@ -90,7 +90,7 @@ for entry in data[artifact_name]:
         continue
 
     # Otherwise, print out git-tree-sha1 and download URL
-    print("%s %s %s"%(entry["git-tree-sha1"],entry["download"][0]["url"],platform_key_abi(entry)))
+    sys.stdout.write("%s %s %s"%(entry["git-tree-sha1"],entry["download"][0]["url"],platform_key_abi(entry)))
     sys.exit(0)
 
 raise Exception("Unable to find a matching artifact in %s for %s!"%(artifacts_toml, platform_triplet))
