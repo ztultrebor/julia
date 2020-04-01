@@ -171,7 +171,9 @@ julia> Meta.parse("x = 3, y = 5", 5)
 """
 function parse(str::AbstractString, pos::Integer; greedy::Bool=true, raise::Bool=true,
                depwarn::Bool=true)
-    # pos is one based byte offset.
+    if pos < 1 || pos > ncodeunits(str) + 1
+        throw(BoundsError(str, pos))
+    end
     filename = "none"
     JL_PARSE_ATOM = 1
     JL_PARSE_STATEMENT = 2
@@ -179,13 +181,15 @@ function parse(str::AbstractString, pos::Integer; greedy::Bool=true, raise::Bool
     # For now, assume all parser warnings are depwarns
     # TODO: remove parser-depwarn; parser no longer emits warnings.
     ex, pos = with_logger(depwarn ? current_logger() : NullLogger()) do
-        ccall(:jl_parse, Any, (String, String, Cint, Cint),
-              str, filename, pos, rule)
+        ccall(:jl_parse, Any,
+              (Ptr{UInt8}, Csize_t, Ptr{UInt8}, Csize_t, Csize_t, Cint),
+              str, sizeof(str), filename, sizeof(filename), pos-1, rule)
     end
     if raise && isa(ex,Expr) && ex.head === :error
         throw(ParseError(ex.args[1]))
     end
-    return ex, pos
+    # internal pos is zero-based byte offset
+    return ex, pos+1
 end
 
 """

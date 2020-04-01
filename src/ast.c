@@ -779,42 +779,38 @@ static value_t julia_to_scm_(fl_context_t *fl_ctx, jl_value_t *v)
     return julia_to_scm_noalloc2(fl_ctx, v);
 }
 
-// Parse string `content` starting at 1-based index `start_pos` attributing the
+// Parse string `content` starting at 0-based index `offset` attributing the
 // content to `filename`. Return an svec of (parse_result, final_pos)
-JL_DLLEXPORT jl_value_t *jl_fl_parse(jl_value_t *text, jl_value_t *filename,
-                                     int start_pos, int rule)
+JL_DLLEXPORT jl_value_t *jl_fl_parse(const char* text, size_t text_len,
+                                     const char* filename, size_t filename_len,
+                                     size_t offset, int rule)
 {
     JL_TIMING(PARSING);
-    if (!jl_is_string(text) || !jl_is_string(filename)) {
-        jl_errorf("File content and name must be Strings");
+    if (offset > text_len) {
+        jl_value_t *textstr = jl_pchar_to_string(text, text_len);
+        JL_GC_PUSH1(&textstr);
+        jl_bounds_error(textstr, jl_box_long(offset));
     }
-    if (start_pos < 1 || start_pos > (int)jl_string_len(text) + 1) {
-        // jl_bounds_error roots the arguments.
-        jl_bounds_error(jl_box_long(start_pos), text);
-    }
-    else if (start_pos != 1 && rule == JL_PARSE_TOPLEVEL) {
+    else if (offset != 0 && rule == JL_PARSE_ALL) {
         jl_error("Partial parsing not support by top level grammar rule");
     }
 
     jl_ast_context_t *ctx = jl_ast_ctx_enter();
     fl_context_t *fl_ctx = &ctx->fl;
-    value_t fl_text = cvalue_static_cstrn(fl_ctx, jl_string_data(text),
-                                          jl_string_len(text));
-    value_t fl_filename = cvalue_static_cstrn(fl_ctx, jl_string_data(filename),
-                                              jl_string_len(filename));
+    value_t fl_text = cvalue_static_cstrn(fl_ctx, text, text_len);
+    value_t fl_filename = cvalue_static_cstrn(fl_ctx, filename, filename_len);
     value_t fl_expr;
     size_t pos1 = 0;
-    if (rule == JL_PARSE_TOPLEVEL) {
+    if (rule == JL_PARSE_ALL) {
         value_t e = fl_applyn(fl_ctx, 2, symbol_value(symbol(fl_ctx, "jl-parse-all")),
                               fl_text, fl_filename);
         fl_expr = e;
-        pos1 = e == fl_ctx->FL_EOF ? jl_string_len(text) : 0;
+        pos1 = e == fl_ctx->FL_EOF ? text_len : 0;
     }
     else if (rule == JL_PARSE_STATEMENT || rule == JL_PARSE_ATOM) {
         value_t greedy = rule == JL_PARSE_STATEMENT ? fl_ctx->T : fl_ctx->F;
-        value_t offset = fixnum(start_pos-1);
         value_t p = fl_applyn(fl_ctx, 4, symbol_value(symbol(fl_ctx, "jl-parse-one")),
-                              fl_text, fl_filename, offset, greedy);
+                              fl_text, fl_filename, fixnum(offset), greedy);
         fl_expr = car_(p);
         pos1 = tosize(fl_ctx, cdr_(p), "parse");
     }
@@ -824,12 +820,12 @@ JL_DLLEXPORT jl_value_t *jl_fl_parse(jl_value_t *text, jl_value_t *filename,
     }
 
     // Convert to julia values
-    jl_value_t *expr=NULL, *end_pos=NULL;
-    JL_GC_PUSH2(&expr, &end_pos);
+    jl_value_t *expr=NULL, *end_offset=NULL;
+    JL_GC_PUSH2(&expr, &end_offset);
     expr = fl_expr == fl_ctx->FL_EOF ? jl_nothing : scm_to_julia(fl_ctx, fl_expr, NULL);
-    end_pos = jl_box_long(pos1 + 1);
+    end_offset = jl_box_long(pos1);
     jl_ast_ctx_leave(ctx);
-    jl_value_t *result = (jl_value_t*)jl_svec2(expr, end_pos);
+    jl_value_t *result = (jl_value_t*)jl_svec2(expr, end_offset);
     JL_GC_POP();
     return result;
 }
