@@ -255,7 +255,7 @@ end
 @testset "timedwait" begin
     @test timedwait(() -> true, 0) === :ok
     @test timedwait(() -> false, 0) === :timed_out
-    @test_broken timedwait(() -> error("callback failed"), 0) === :error
+    @test_throws ErrorException timedwait(() -> error("callback failed"), 0)
     @test_throws ArgumentError timedwait(() -> true, 0; pollint=0)
 
     # Allowing a smaller positive `pollint` results in `timewait` hanging
